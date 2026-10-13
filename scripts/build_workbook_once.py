@@ -188,8 +188,8 @@ def build():
             "style": {"backgroundColor": WHITE},
         }
 
-    def tv_plugin(eid, src_eid="wb-tv", kpi_eid="wb-src"):
-        # ACV chart grain (fast) + SEG Actual from wb-src (open-VW; not loaded on ROTB).
+    def tv_plugin(eid, src_eid="wb-tv"):
+        # ACV-only grain — no open-VW bind on Total (SEG Actual omitted for speed).
         return {
             "id": eid, "kind": "plugin", "pluginId": TV_ID, "displayName": "Target vs Actual",
             "config": {
@@ -199,12 +199,6 @@ def build():
                 "series": {"kind": "column", "columnId": f"{src_eid}-2", "source": "source"},
                 "val": {"kind": "column", "columnId": f"{src_eid}-3", "source": "source"},
                 "opps": {"kind": "column", "columnId": f"{src_eid}-4", "source": "source"},
-                "kpiSource": {"kind": "element", "elementId": kpi_eid},
-                "mkt": {"kind": "column", "columnId": f"{kpi_eid}-0", "source": "kpiSource"},
-                "sales": {"kind": "column", "columnId": f"{kpi_eid}-1", "source": "kpiSource"},
-                "segCore": {"kind": "column", "columnId": f"{kpi_eid}-5", "source": "kpiSource"},
-                "segMid": {"kind": "column", "columnId": f"{kpi_eid}-6", "source": "kpiSource"},
-                "segEnt": {"kind": "column", "columnId": f"{kpi_eid}-7", "source": "kpiSource"},
             },
             "style": {"backgroundColor": WHITE},
         }
@@ -318,26 +312,17 @@ def build():
           hero(ref(P, "Q4_ACV", "$,.2s"), INK, 32) + "\n" +
           f'<p class="p-small"><span style="color:{BLUE}">Close Date: Current Quarter</span></p>'),
         funnel_plugin("plugin-funnel"),
-        T("mv-left", f'<p class="p-small"><span style="color:{MUTED}">WHAT LEFT</span></p>'),
-        C("mv-lost-c", RED_BG, "#fecaca"), C("mv-walk-c", "#eff6ff", "#93c5fd"),
+        # Closed won/lost intentionally omitted here (VW) — see Movement tab.
+        T("mv-left", f'<p class="p-small"><span style="color:{MUTED}">BASELINE · EARLY · ADDED (closed won/lost on Movement)</span></p>'),
+        C("mv-walk-c", "#eff6ff", "#93c5fd"), C("mv-early-c", RED_BG, "#fecaca"),
         T("mv-walk",
           f'<p class="p-small"><span style="color:{BLUE}">Walk-in (Q4 start)</span></p>\n'
           + hero(ref(W, "WALKIN_ACV", "$,.2s"), BLUE, 26) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">Frozen · {ref(W,"WALKIN_OPPS",",.0f")} opps</span></p>'),
-        T("mv-lost",
-          f'<p class="p-small"><span style="color:{RED}">Closed Lost</span></p>\n'
-          + hero(ref(Z, "LOST_ACV", "$,.2s"), RED, 26) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">{ref(Z,"LOST_OPPS",",.0f")} opps · ≤ $50k</span></p>'),
-        T("mv-also", f'<p class="p-small"><span style="color:{MUTED}">ALSO LEFT PIPELINE</span></p>'),
-        C("mv-won-c", GREEN_BG, "#bbf7d0"), C("mv-early-c", RED_BG, "#fecaca"),
         T("mv-early",
           f'<p class="p-small"><span style="color:{RED}">Early stage open (S0)</span></p>\n'
           + hero(ref(O, "S0_ACV", "$,.2s"), RED, 22) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">S0 {ref(O,"S0_OPPS",",.0f")} · S1 {ref(O,"S1_OPPS",",.0f")} opps</span></p>'),
-        T("mv-won",
-          f'<p class="p-small"><span style="color:{GREEN}">Closed Won</span></p>\n'
-          + hero(ref(Z, "WON_ACV", "$,.2s"), GREEN, 26) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">{ref(Z,"WON_OPPS",",.0f")} opps</span></p>'),
         T("mv-add", f'<p class="p-small"><span style="color:{MUTED}">WHAT ADDED</span></p>'),
         C("mv-cr-c", GREEN_BG, "#bbf7d0"), C("mv-ccq-c", AMBER_BG, "#fbbf24"),
         T("mv-cr",
@@ -368,8 +353,9 @@ def build():
           f'<p class="p-small"><span style="color:{MUTED}">Q2 2027 · {ref(P,"Q2OUT_OPPS",",.0f")} open deals</span></p>'),
         tv_plugin("plugin-tv"),
         T("total-defs",
-          f'<p class="p-small"><span style="color:{MUTED}">Up-Market = Mid-Market + Enterprise · '
-          f'Insurance Intelligence = Analytics + Client + Content · RQC &amp; AMS = RQC + Service</span></p>'),
+          f'<p class="p-small"><span style="color:{MUTED}">Product actuals = ACV metrics (fast) · '
+          f'Segment bars = 2H targets (open-VW segment actuals on Pipeline Sourcing) · '
+          f'Up-Market = Mid-Market + Enterprise · II = Analytics + Client + Content · RQC &amp; AMS = RQC + Service</span></p>'),
     ]
 
     # ═══════════════ SOURCING ═══════════════
@@ -397,7 +383,7 @@ def build():
           f'M {ref(S,"MKT_MIX",".0%")} / S {ref(S,"SALES_MIX",".0%")}</span></p>\n'
           f'<p class="p-small" style="text-align:center"><span style="color:{MUTED}">target M 39% / S 61%</span></p>'),
         T("sk-note",
-          f'<p class="p-small"><span style="color:{MUTED}">1-row KPI Open · text heroes · Q4 FY2026</span></p>'),
+          f'<p class="p-small"><span style="color:{MUTED}">Open-VW 1-row agg · Marketing/Sales mix · also feeds segment context · Q4 FY2026</span></p>'),
     ]
 
     # ═══════════════ MOVEMENT ═══════════════
@@ -456,20 +442,15 @@ def build():
           hero(ref(P, "CREATED_CLOSING_ACV", "$,.2s"), ORANGE, 28) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"CREATED_CLOSING_OPPS",",.0f")} opps</span></p>'),
         T("ckp-won",
-          label("CREATED & WON THIS Q") + "\n" +
-          hero(ref(Z, "WON_ACV", "$,.2s"), GREEN, 28) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">{ref(Z,"WON_OPPS",",.0f")} opps · entered Stage 2 this Q</span></p>'),
-        T("bridge-h", f'## Pipeline Bridge — Q4 FY2026\n<span style="color:{MUTED}">Walk-in at quarter start + created − won − lost ≈ total open today</span>'),
-        C("cc-start"), C("cc-cr", GREEN_BG, "#bbf7d0"), C("cc-wn", RED_BG, "#fecaca"),
-        C("cc-ls", RED_BG, "#fecaca"), C("cc-tot", "#eff6ff", "#93c5fd"),
+          label("CLOSING THIS YEAR") + "\n" +
+          hero(ref(P, "CLOSE_CY_ACV", "$,.2s"), GREEN, 28) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"CLOSE_CY_PCT",".0%")} of open · pack grain</span></p>'),
+        T("bridge-h", f'## Pipeline Bridge — Q4 FY2026\n<span style="color:{MUTED}">Walk-in + created ≈ open (won/lost detail on Movement · no VW here)</span>'),
+        C("cc-start"), C("cc-cr", GREEN_BG, "#bbf7d0"), C("cc-tot", "#eff6ff", "#93c5fd"),
         T("ck-start", label("OPEN (QTR START)") + "\n" + hero(ref(W, "WALKIN_ACV", "$,.0f"), BLUE, 24)),
         T("ck-plus", f'<p class="p-small" style="text-align:center"><span style="font-size:28px;color:{MUTED}">+</span></p>'),
         T("ck-cr", label("CREATED THIS QUARTER") + "\n" + hero(ref(P, "Q4_CREATED_ACV", "$,.0f"), GREEN, 24)),
-        T("ck-m1", f'<p class="p-small" style="text-align:center"><span style="font-size:28px;color:{MUTED}">−</span></p>'),
-        T("ck-wn", label("CLOSED WON") + "\n" + hero(ref(Z, "WON_ACV", "$,.0f"), RED, 24)),
-        T("ck-m2", f'<p class="p-small" style="text-align:center"><span style="font-size:28px;color:{MUTED}">−</span></p>'),
-        T("ck-ls", label("CLOSED LOST") + "\n" + hero(ref(Z, "LOST_ACV", "$,.0f"), RED, 24)),
-        T("ck-eq", f'<p class="p-small" style="text-align:center"><span style="font-size:28px;color:{MUTED}">=</span></p>'),
+        T("ck-eq", f'<p class="p-small" style="text-align:center"><span style="font-size:28px;color:{MUTED}">≈</span></p>'),
         T("ck-tot", label("TOTAL OPEN") + "\n" + hero(ref(P, "TOTAL_ACV", "$,.0f"), BLUE, 24)),
         T("close-h", f'## Total open pipeline by close year\n<span style="color:{MUTED}">Share of open ACV</span>'),
         C("cc-cy"), C("cc-ny"), C("cc-fy"),
@@ -553,13 +534,10 @@ TV charts = ACV product + lean VW segment (Total page). No open-KPI plugins. No 
             L("open-chg", 1, 25, 1, 2), L("ok-q4tot", 1, 9, 2, 5), L("plugin-funnel", 1, 15, 5, 17),
             L("mv-left", 15, 25, 2, 3),
             Cont("mv-walk-c", 15, 20, 3, 7, [L("mv-walk", 1, 25, 1, 8)], 2),
-            Cont("mv-lost-c", 20, 25, 3, 7, [L("mv-lost", 1, 25, 1, 8)], 2),
-            L("mv-also", 15, 25, 7, 8),
-            Cont("mv-early-c", 15, 20, 8, 12, [L("mv-early", 1, 25, 1, 8)], 2),
-            Cont("mv-won-c", 20, 25, 8, 12, [L("mv-won", 1, 25, 1, 8)], 2),
-            L("mv-add", 15, 25, 12, 13),
-            Cont("mv-cr-c", 15, 20, 13, 17, [L("mv-cr", 1, 25, 1, 8)], 2),
-            Cont("mv-ccq-c", 20, 25, 13, 17, [L("mv-ccq", 1, 25, 1, 8)], 2),
+            Cont("mv-early-c", 20, 25, 3, 7, [L("mv-early", 1, 25, 1, 8)], 2),
+            L("mv-add", 15, 25, 7, 8),
+            Cont("mv-cr-c", 15, 20, 8, 12, [L("mv-cr", 1, 25, 1, 8)], 2),
+            Cont("mv-ccq-c", 20, 25, 8, 12, [L("mv-ccq", 1, 25, 1, 8)], 2),
         ]),
     ]
     total_l = [
@@ -599,15 +577,11 @@ TV charts = ACV product + lean VW segment (Total page). No open-KPI plugins. No 
         Cont("ckp-4", 16, 21, 3, 8, [L("ckp-ccq", 1, 25, 1, 8)]),
         Cont("ckp-5", 21, 25, 3, 8, [L("ckp-won", 1, 25, 1, 8)]),
         E("bridge-h", 1, 25, 8, 10),
-        Cont("cc-start", 1, 5, 10, 14, [L("ck-start", 1, 25, 1, 8)]),
-        E("ck-plus", 5, 6, 10, 14),
-        Cont("cc-cr", 6, 10, 10, 14, [L("ck-cr", 1, 25, 1, 8)]),
-        E("ck-m1", 10, 11, 10, 14),
-        Cont("cc-wn", 11, 15, 10, 14, [L("ck-wn", 1, 25, 1, 8)]),
-        E("ck-m2", 15, 16, 10, 14),
-        Cont("cc-ls", 16, 20, 10, 14, [L("ck-ls", 1, 25, 1, 8)]),
-        E("ck-eq", 20, 21, 10, 14),
-        Cont("cc-tot", 21, 25, 10, 14, [L("ck-tot", 1, 25, 1, 8)]),
+        Cont("cc-start", 1, 8, 10, 14, [L("ck-start", 1, 25, 1, 8)]),
+        E("ck-plus", 8, 9, 10, 14),
+        Cont("cc-cr", 9, 16, 10, 14, [L("ck-cr", 1, 25, 1, 8)]),
+        E("ck-eq", 16, 17, 10, 14),
+        Cont("cc-tot", 17, 25, 10, 14, [L("ck-tot", 1, 25, 1, 8)]),
         E("close-h", 1, 25, 14, 16),
         Cont("cc-cy", 1, 9, 16, 20, [L("ck-cy", 1, 25, 1, 8)]),
         Cont("cc-ny", 9, 17, 16, 20, [L("ck-ny", 1, 25, 1, 8)]),
