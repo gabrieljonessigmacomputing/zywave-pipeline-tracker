@@ -156,56 +156,67 @@ WHERE METRIC_NAME='Forecasted Net ACV' AND STAGE_2_ATTAINED
 GROUP BY 1
 """
 
-    # 6) ONE VW open scan → charts (SEG/PROD/SRC) + KPI grain (early + sourcing)
-    # Workbook derives 1-row KPI Open from this grain (no second open VW scan).
-    charts = """
-WITH open_all AS (
+    # 6a) 1-row open KPIs for text heroes — early = ACV metrics; sourcing = 1-row VW agg.
+    # No plugins. No SumIf. Never bind row-level VW into the workbook.
+    open_kpi = """
+WITH early AS (
   SELECT
-    LEFT("Stage Name",1) AS STAGE_N,
+    COUNT(DISTINCT IFF(LEFT(STAGE,1)='0' AND METRIC_VALUE BETWEEN 0 AND 5000000, OPPORTUNITY_ID, NULL)) AS S0_OPPS,
+    COALESCE(SUM(IFF(LEFT(STAGE,1)='0' AND METRIC_VALUE BETWEEN 0 AND 5000000, METRIC_VALUE, 0)),0) AS S0_ACV,
+    COUNT(DISTINCT IFF(LEFT(STAGE,1)='1' AND METRIC_VALUE BETWEEN 0 AND 5000000, OPPORTUNITY_ID, NULL)) AS S1_OPPS,
+    COALESCE(SUM(IFF(LEFT(STAGE,1)='1' AND METRIC_VALUE BETWEEN 0 AND 5000000, METRIC_VALUE, 0)),0) AS S1_ACV,
+    COUNT(DISTINCT IFF(LEFT(STAGE,1)='2' AND METRIC_VALUE BETWEEN 0 AND 5000000, OPPORTUNITY_ID, NULL)) AS S2_OPPS,
+    COALESCE(SUM(IFF(LEFT(STAGE,1)='2' AND METRIC_VALUE BETWEEN 0 AND 5000000, METRIC_VALUE, 0)),0) AS S2_ACV
+  FROM BI_STAGING.DATA.OPPORTUNITY_ACV_METRICS
+  WHERE METRIC_NAME = 'Forecasted Net ACV'
+    AND LEFT(STAGE,1) IN ('0','1','2')
+),
+src AS (
+  SELECT
+    COALESCE(SUM(IFF("Lead Source"='Marketing' AND FCST_NETACV BETWEEN 0 AND 5000000, FCST_NETACV, 0)),0) AS MKT_ACV,
+    COALESCE(SUM(IFF("Lead Source"='Sales Generated' AND FCST_NETACV BETWEEN 0 AND 5000000, FCST_NETACV, 0)),0) AS SALES_ACV
+  FROM BI_PRESENTATION.REPORT.VW_PIPELINE
+  WHERE NOT "Is Closed"
+    AND LEFT("Stage Name",1) IN ('2','3','4','5','6','7')
+)
+SELECT
+  s.MKT_ACV, s.SALES_ACV,
+  e.S0_OPPS, e.S0_ACV, e.S1_OPPS, e.S1_ACV, e.S2_OPPS, e.S2_ACV,
+  s.MKT_ACV + s.SALES_ACV AS SRC_TOTAL_ACV,
+  IFF(s.MKT_ACV + s.SALES_ACV > 0, s.MKT_ACV / (s.MKT_ACV + s.SALES_ACV), 0) AS MKT_MIX,
+  IFF(s.MKT_ACV + s.SALES_ACV > 0, s.SALES_ACV / (s.MKT_ACV + s.SALES_ACV), 0) AS SALES_MIX
+FROM early e CROSS JOIN src s
+"""
+
+    # 6b) TV charts: PROD from ACV (fast); SEG from lean VW GROUP BY (pre-aggregated).
+    charts = """
+WITH prod_act AS (
+  SELECT
+    CASE
+      WHEN CONTAINS(PRODUCT_CATEGORY,'Analytics') OR CONTAINS(PRODUCT_CATEGORY,'Marketing')
+        OR CONTAINS(PRODUCT_CATEGORY,'Client') OR CONTAINS(PRODUCT_CATEGORY,'Content')
+        THEN 'Insurance Intelligence'
+      WHEN CONTAINS(PRODUCT_CATEGORY,'RQC') OR CONTAINS(PRODUCT_CATEGORY,'AMS')
+        OR CONTAINS(PRODUCT_CATEGORY,'Service') THEN 'RQC & AMS'
+      ELSE 'Platform Sales'
+    END AS DIM,
+    COALESCE(SUM(METRIC_VALUE),0) AS ACTUAL
+  FROM BI_STAGING.DATA.OPPORTUNITY_ACV_METRICS
+  WHERE METRIC_NAME = 'Forecasted Net ACV' AND STAGE_GROUP = '2-7'
+  GROUP BY 1
+),
+seg_act AS (
+  SELECT
     CASE
       WHEN CONTAINS("Segment",'Core') THEN 'Core'
       WHEN CONTAINS("Segment",'Mid') OR "Segment"='MM' THEN 'Mid-Market'
       WHEN CONTAINS("Segment",'Enterprise') OR CONTAINS("Segment",'Up-Market') THEN 'Enterprise'
       ELSE 'Other'
-    END AS SEG,
-    CASE
-      WHEN CONTAINS("Product Category",'Analytics') OR CONTAINS("Product Category",'Marketing')
-        OR CONTAINS("Product Category",'Client') OR CONTAINS("Product Category",'Content')
-        THEN 'Insurance Intelligence'
-      WHEN CONTAINS("Product Category",'RQC') OR CONTAINS("Product Category",'AMS')
-        OR CONTAINS("Product Category",'Service') THEN 'RQC & AMS'
-      ELSE 'Platform Sales'
-    END AS PGRP,
-    CASE WHEN "Lead Source"='Marketing' THEN 'Marketing'
-         WHEN "Lead Source"='Sales Generated' THEN 'Sales' ELSE 'Other' END AS SRC,
-    CASE WHEN FCST_NETACV BETWEEN 0 AND 5000000 THEN FCST_NETACV ELSE 0 END AS ACV,
-    ID
+    END AS DIM,
+    COALESCE(SUM(IFF(FCST_NETACV BETWEEN 0 AND 5000000, FCST_NETACV, 0)),0) AS ACTUAL
   FROM BI_PRESENTATION.REPORT.VW_PIPELINE
-  WHERE NOT "Is Closed" AND LEFT("Stage Name",1) IN ('0','1','2','3','4','5','6','7')
-),
-open_27 AS (
-  SELECT * FROM open_all WHERE STAGE_N IN ('2','3','4','5','6','7')
-),
-seg_act AS (
-  SELECT SEG AS DIM, COALESCE(SUM(ACV),0) AS ACTUAL FROM open_27 WHERE SEG <> 'Other' GROUP BY 1
-),
-prod_act AS (
-  SELECT PGRP AS DIM, COALESCE(SUM(ACV),0) AS ACTUAL FROM open_27 GROUP BY 1
-),
-src_act AS (
-  SELECT SRC AS DIM, COUNT(DISTINCT ID) AS OPPS, COALESCE(SUM(ACV),0) AS ACTUAL FROM open_27 GROUP BY 1
-),
-kpi AS (
-  SELECT
-    COALESCE(SUM(IFF(STAGE_N IN ('2','3','4','5','6','7') AND SRC='Marketing', ACV, 0)),0) AS MKT_ACV,
-    COALESCE(SUM(IFF(STAGE_N IN ('2','3','4','5','6','7') AND SRC='Sales', ACV, 0)),0) AS SALES_ACV,
-    COUNT(DISTINCT IFF(STAGE_N='0', ID, NULL)) AS S0_OPPS,
-    COALESCE(SUM(IFF(STAGE_N='0', ACV, 0)),0) AS S0_ACV,
-    COUNT(DISTINCT IFF(STAGE_N='1', ID, NULL)) AS S1_OPPS,
-    COALESCE(SUM(IFF(STAGE_N='1', ACV, 0)),0) AS S1_ACV,
-    COUNT(DISTINCT IFF(STAGE_N='2', ID, NULL)) AS S2_OPPS,
-    COALESCE(SUM(IFF(STAGE_N='2', ACV, 0)),0) AS S2_ACV
-  FROM open_all
+  WHERE NOT "Is Closed" AND LEFT("Stage Name",1) IN ('2','3','4','5','6','7')
+  GROUP BY 1
 )
 SELECT 'SEG' AS GRAIN, t.DIM, 'Target' AS SERIES, t.TARGET AS VAL, NULL::FLOAT AS OPPS
 FROM (
@@ -214,7 +225,7 @@ FROM (
   UNION ALL SELECT 'Enterprise', 20000000
 ) t
 UNION ALL
-SELECT 'SEG', a.DIM, 'Actual', a.ACTUAL, NULL FROM seg_act a
+SELECT 'SEG', a.DIM, 'Actual', a.ACTUAL, NULL FROM seg_act a WHERE a.DIM <> 'Other'
 UNION ALL
 SELECT 'PROD', t.DIM, 'Target', t.TARGET, NULL FROM (
   SELECT 'Insurance Intelligence' AS DIM, 31000000::FLOAT AS TARGET
@@ -223,18 +234,6 @@ SELECT 'PROD', t.DIM, 'Target', t.TARGET, NULL FROM (
 ) t
 UNION ALL
 SELECT 'PROD', a.DIM, 'Actual', a.ACTUAL, NULL FROM prod_act a
-UNION ALL
-SELECT 'SRC', a.DIM, 'Actual', a.ACTUAL, a.OPPS::FLOAT FROM src_act a
-UNION ALL
-SELECT 'KPI', 'MKT', 'Actual', k.MKT_ACV, NULL FROM kpi k
-UNION ALL
-SELECT 'KPI', 'SALES', 'Actual', k.SALES_ACV, NULL FROM kpi k
-UNION ALL
-SELECT 'KPI', 'S0', 'Actual', k.S0_ACV, k.S0_OPPS::FLOAT FROM kpi k
-UNION ALL
-SELECT 'KPI', 'S1', 'Actual', k.S1_ACV, k.S1_OPPS::FLOAT FROM kpi k
-UNION ALL
-SELECT 'KPI', 'S2', 'Actual', k.S2_ACV, k.S2_OPPS::FLOAT FROM kpi k
 """
 
     pack_cols = [
@@ -263,11 +262,19 @@ WHERE SNAPSHOTDATE >= DATEADD(day, -60, CURRENT_DATE())
 GROUP BY 1
 """
 
+    open_kpi_cols = [
+        ("MKT_ACV", m()), ("SALES_ACV", m()),
+        ("S0_OPPS", None), ("S0_ACV", m()), ("S1_OPPS", None), ("S1_ACV", m()),
+        ("S2_OPPS", None), ("S2_ACV", m()),
+        ("SRC_TOTAL_ACV", m()), ("MKT_MIX", p()), ("SALES_MIX", p()),
+    ]
     return [
         sql_table("kpi-pack", "KPI Pack", pack, pack_cols),
         sql_table("kpi-walkin", "KPI Walkin", walkin, [("WALKIN_OPPS", None), ("WALKIN_ACV", m())]),
         sql_table("kpi-closed", "KPI Closed Q4", closed, closed_cols),
-        # ONE open VW scan — charts + KPI grain (early/sourcing). Workbook reads KPIs via plugin.
+        # 1-row open KPIs → workbook text {{[WB Open/…]}} (no Sum, no plugin synth)
+        sql_table("kpi-open", "KPI Open", open_kpi, open_kpi_cols),
+        # Stage 2–7 charts only for TV plugin
         sql_table("chart-tv", "Chart Target Actual Source", charts, [
             ("GRAIN", None), ("DIM", None), ("SERIES", None), ("VAL", m()), ("OPPS", None)]),
         sql_table("chart-funnel", "Chart Funnel", funnel, [
