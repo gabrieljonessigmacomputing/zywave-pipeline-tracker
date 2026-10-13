@@ -503,36 +503,36 @@ Pace + dual TV + funnel plugins subscribe to pass-through tables (no SumIf re-in
 
     rotb = [
         E("rotb-title", 1, 18, 1, 3), E("rotb-badge", 18, 25, 1, 3),
-        Cont("sec-01", 1, 25, 3, 14, [
+        Cont("sec-01", 1, 25, 3, 15, [
             L("rotb-s01", 1, 25, 1, 2),
-            Cont("card-year", 1, 6, 2, 10, [L("plugin-pace-year", 1, 25, 1, 10)], 2),
-            Cont("card-q4", 6, 11, 2, 10, [L("plugin-pace-q4", 1, 25, 1, 10)], 2),
-            Cont("card-week", 11, 15, 2, 10, [L("rk-week", 1, 25, 1, 9)], 2),
-            Cont("card-ccq", 15, 20, 2, 10, [L("rk-ccq", 1, 25, 1, 9)], 2),
-            Cont("card-cwq", 20, 25, 2, 10, [L("rk-cwq", 1, 25, 1, 9)], 2),
-            L("rotb-progress", 1, 25, 10, 12),
+            Cont("card-year", 1, 6, 2, 12, [L("plugin-pace-year", 1, 25, 1, 12)], 2),
+            Cont("card-q4", 6, 11, 2, 12, [L("plugin-pace-q4", 1, 25, 1, 12)], 2),
+            Cont("card-week", 11, 15, 2, 12, [L("rk-week", 1, 25, 1, 11)], 2),
+            Cont("card-ccq", 15, 20, 2, 12, [L("rk-ccq", 1, 25, 1, 11)], 2),
+            Cont("card-cwq", 20, 25, 2, 12, [L("rk-cwq", 1, 25, 1, 11)], 2),
+            L("rotb-progress", 1, 25, 12, 14),
         ]),
-        Cont("sec-02", 1, 25, 14, 19, [
+        Cont("sec-02", 1, 25, 15, 20, [
             L("rotb-s02", 1, 25, 1, 2),
             Cont("cov-1", 1, 7, 2, 6, [L("rk-open", 1, 25, 1, 8)], 2),
             Cont("cov-2", 7, 13, 2, 6, [L("rk-cq", 1, 25, 1, 8)], 2),
             Cont("cov-3", 13, 19, 2, 6, [L("rk-nq", 1, 25, 1, 8)], 2),
             Cont("cov-4", 19, 25, 2, 6, [L("rk-2q", 1, 25, 1, 8)], 2),
         ]),
-        Cont("sec-03", 1, 25, 19, 24, [
+        Cont("sec-03", 1, 25, 20, 25, [
             L("rotb-s03", 1, 25, 1, 2),
             Cont("mgmt-w", 1, 9, 2, 6, [L("rk-walk", 1, 25, 1, 8)], 2),
             Cont("mgmt-l", 9, 17, 2, 6, [L("rk-lost", 1, 25, 1, 8)], 2),
             Cont("mgmt-n", 17, 25, 2, 6, [L("rk-won2", 1, 25, 1, 8)], 2),
         ]),
-        Cont("sec-04", 1, 25, 24, 29, [
+        Cont("sec-04", 1, 25, 25, 30, [
             L("rotb-s04", 1, 25, 1, 2),
             Cont("dm-s0", 1, 7, 2, 6, [L("dm-s0-b", 1, 25, 1, 8)], 2),
             Cont("dm-s1", 7, 13, 2, 6, [L("dm-s1-b", 1, 25, 1, 8)], 2),
             Cont("dm-s2", 13, 19, 2, 6, [L("dm-s2-b", 1, 25, 1, 8)], 2),
             Cont("dm-mo", 19, 25, 2, 6, [L("dm-mo-b", 1, 25, 1, 8)], 2),
         ]),
-        Cont("sec-05", 1, 25, 29, 34, [
+        Cont("sec-05", 1, 25, 30, 35, [
             L("rotb-s05", 1, 25, 1, 2),
             Cont("sg-m", 1, 13, 2, 6, [L("rk-mkt", 1, 25, 1, 8)], 2),
             Cont("sg-s", 13, 25, 2, 6, [L("rk-sales", 1, 25, 1, 8)], 2),

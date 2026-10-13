@@ -3,8 +3,8 @@
   "funnel": "0f1120d9-7ef4-435e-8e8f-cf7b5e431dbc",
   "tv": "8e375e9e-e9d8-45fb-a001-ca7c974e0f35",
   "urls": {
-    "pace": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/pace-bullet/",
-    "funnel": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/stage-funnel/",
-    "tv": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/tv-dual/"
+    "pace": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/pace-bullet-v2/",
+    "funnel": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/stage-funnel-v2/",
+    "tv": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/tv-dual-v2/"
   }
 }
