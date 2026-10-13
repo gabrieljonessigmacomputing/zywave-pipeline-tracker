@@ -124,20 +124,16 @@ def build():
         pass_tbl("wb-pack", "WB Pack", "kpi-pack", "KPI Pack", pack_cols),
         pass_tbl("wb-walkin", "WB Walkin", "kpi-walkin", "KPI Walkin",
                  [("WALKIN_OPPS", None), ("WALKIN_ACV", m())]),
-        # One VW scan for closed + sourcing + early
-        # Split former mega VW: closed Q4 vs open (parallel, each lean)
+        # Closed Q4 separate; open VW KPIs come from chart-tv KPI grain via plugin (no SumIf).
         pass_tbl("wb-closed", "WB Closed", "kpi-closed", "KPI Closed Q4", [
             ("WON_ACV", m()), ("WON_OPPS", None), ("LOST_ACV", m()), ("LOST_OPPS", None),
-        ]),
-        pass_tbl("wb-open", "WB Open", "kpi-open-vw", "KPI Open VW", [
-            ("MKT_ACV", m()), ("SALES_ACV", m()),
-            ("S0_OPPS", None), ("S0_ACV", m()), ("S1_OPPS", None), ("S1_ACV", m()),
-            ("S2_OPPS", None), ("S2_ACV", m()),
-            ("SRC_TOTAL_ACV", m()), ("MKT_MIX", p()), ("SALES_MIX", p()),
         ]),
         # Funnel plugin source only (no Sum() chart on top)
         pass_tbl("wb-funnel", "WB Funnel", "chart-funnel", "Chart Funnel",
                  [("STAGE", None), ("ORD", None), ("ACV", m())]),
+        # ONE open VW scan — charts + KPI grain; all open KPI plugins + TV bind here.
+        pass_tbl("wb-tv", "WB TV", "chart-tv", "Chart Target Actual Source",
+                 [("GRAIN", None), ("DIM", None), ("SERIES", None), ("VAL", m()), ("OPPS", None)]),
     ]
 
     # Column ids on wb-pack (must match pack_cols order above)
@@ -147,8 +143,9 @@ def build():
 
     plug = load_plugin_ids()
     PACE_ID, FUNNEL_ID, TV_ID = plug["pace"], plug["funnel"], plug["tv"]
+    OPEN_KPI_ID = plug["openKpis"]
     P, W = "WB Pack", "WB Walkin"
-    Z, S, ERL = "WB Closed", "WB Open", "WB Open"  # won/lost vs open sourcing/early
+    Z = "WB Closed"
 
     def ref(table, col, fmt):
         return "{{" + f"[{table}/{col}] | {fmt}" + "}}"
@@ -193,6 +190,22 @@ def build():
                 "series": {"kind": "column", "columnId": f"{src_eid}-2", "source": "source"},
                 "val": {"kind": "column", "columnId": f"{src_eid}-3", "source": "source"},
                 "opps": {"kind": "column", "columnId": f"{src_eid}-4", "source": "source"},
+            },
+            "style": {"backgroundColor": WHITE},
+        }
+
+    def open_kpi_plugin(eid, mode, src_eid="wb-tv"):
+        # KPI grain rows from the same chart-tv scan as TV charts — no SumIf / no wb-open.
+        return {
+            "id": eid, "kind": "plugin", "pluginId": OPEN_KPI_ID, "displayName": f"Open KPIs ({mode})",
+            "config": {
+                "source": {"kind": "element", "elementId": src_eid},
+                "grain": {"kind": "column", "columnId": f"{src_eid}-0", "source": "source"},
+                "dim": {"kind": "column", "columnId": f"{src_eid}-1", "source": "source"},
+                "series": {"kind": "column", "columnId": f"{src_eid}-2", "source": "source"},
+                "val": {"kind": "column", "columnId": f"{src_eid}-3", "source": "source"},
+                "opps": {"kind": "column", "columnId": f"{src_eid}-4", "source": "source"},
+                "mode": mode,
             },
             "style": {"backgroundColor": WHITE},
         }
@@ -267,27 +280,15 @@ def build():
           hero(ref(Z, "WON_ACV", "$,.2s"), GREEN, 28) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">{ref(Z,"WON_OPPS",",.0f")} opportunities</span></p>'),
         T("rotb-s04", f'## <span style="color:{BLUE}">04 / EARLY STAGE PIPELINE</span>\nOpen Stage 0–2 · live from VW_PIPELINE'),
-        C("dm-s0"), C("dm-s1"), C("dm-s2"), C("dm-mo"),
-        T("dm-s0-b",
-          label("STAGE 0 OPEN") + "\n" +
-          hero(ref(ERL, "S0_ACV", "$,.2s"), BLUE, 28) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">{ref(ERL,"S0_OPPS",",.0f")} opportunities</span></p>'),
-        T("dm-s1-b",
-          label("STAGE 1 OPEN") + "\n" +
-          hero(ref(ERL, "S1_ACV", "$,.2s"), BLUE, 28) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">{ref(ERL,"S1_OPPS",",.0f")} opportunities</span></p>'),
-        T("dm-s2-b",
-          label("STAGE 2 OPEN") + "\n" +
-          hero(ref(ERL, "S2_ACV", "$,.2s"), TEAL, 28) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">{ref(ERL,"S2_OPPS",",.0f")} opportunities</span></p>'),
+        C("dm-early"), C("dm-mo"),
+        open_kpi_plugin("plugin-early", "early"),
         T("dm-mo-b",
           label("STAGE 2 CREATED THIS MONTH") + "\n" +
           hero(ref(P, "MONTH_ACV", "$,.2s"), ORANGE, 28) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"MONTH_OPPS",",.0f")} opportunities</span></p>'),
         T("rotb-s05", f'## <span style="color:{ORANGE}">05 / SALES PIPELINE GENERATION</span>\nOpen Stage 2+ by Lead Source'),
-        C("sg-m"), C("sg-s"),
-        T("rk-mkt", label("MARKETING-SOURCED") + "\n" + hero(ref(S, "MKT_ACV", "$,.2s"), BLUE, 32)),
-        T("rk-sales", label("SALES-SOURCED") + "\n" + hero(ref(S, "SALES_ACV", "$,.2s"), ORANGE, 32)),
+        C("sg-src"),
+        open_kpi_plugin("plugin-src", "src"),
         T("rotb-progress",
           f'<p class="p-small"><span style="color:{MUTED}">Year progress {ref(P,"YEAR_ELAPSED",".0%")} · '
           f'Quarter progress {ref(P,"Q4_ELAPSED",".0%")}</span></p>'),
@@ -329,10 +330,7 @@ def build():
           f'<p class="p-small"><span style="color:{MUTED}">{ref(Z,"LOST_OPPS",",.0f")} opps · ≤ $50k</span></p>'),
         T("mv-also", f'<p class="p-small"><span style="color:{MUTED}">ALSO LEFT PIPELINE</span></p>'),
         C("mv-won-c", GREEN_BG, "#bbf7d0"), C("mv-early-c", RED_BG, "#fecaca"),
-        T("mv-early",
-          f'<p class="p-small"><span style="color:{RED}">Early stage open (S0+S1)</span></p>\n'
-          + hero(ref(ERL, "S0_ACV", "$,.2s"), RED, 22) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">S0 {ref(ERL,"S0_OPPS",",.0f")} · S1 {ref(ERL,"S1_OPPS",",.0f")} opps</span></p>'),
+        open_kpi_plugin("plugin-left", "left"),
         T("mv-won",
           f'<p class="p-small"><span style="color:{GREEN}">Closed Won</span></p>\n'
           + hero(ref(Z, "WON_ACV", "$,.2s"), GREEN, 26) + "\n" +
@@ -365,9 +363,6 @@ def build():
           label("PIPELINE TO CLOSE 2 QUARTERS OUT") + "\n" +
           hero(ref(P, "Q2OUT_ACV", "$,.2s")) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">Q2 2027 · {ref(P,"Q2OUT_OPPS",",.0f")} open deals</span></p>'),
-        # One chart-tv grain; dual plugin splits SEG/PROD client-side (no SumIf re-inline).
-        pass_tbl("wb-tv", "WB TV", "chart-tv", "Chart Target Actual Source",
-                 [("GRAIN", None), ("DIM", None), ("SERIES", None), ("VAL", m()), ("OPPS", None)]),
         tv_plugin("plugin-tv"),
         T("total-defs",
           f'<p class="p-small"><span style="color:{MUTED}">Up-Market = Mid-Market + Enterprise · '
@@ -377,29 +372,9 @@ def build():
     # ═══════════════ SOURCING ═══════════════
     els += [
         T("sourcing-title", f'# Pipeline Sourcing\n<p class="p-small"><span style="color:{MUTED}">Marketing vs Sales by deal type · Stage 2+</span></p>'),
-        C("sc-row", SECTION, SECTION),
-        C("sc-m-card"), C("sc-s-card"), C("sc-t-card"), C("sc-mix-card", AMBER_BG, "#fbbf24"),
-        T("sk-m",
-          label("MARKETING-SOURCED") + "\n" +
-          hero(ref(S, "MKT_ACV", "$,.2s"), BLUE, 32) + "\n" +
-          f'<p class="p-small"><span style="color:{BLUE}">Actual mix {ref(S,"MKT_MIX",".0%")}</span></p>\n'
-          f'<p class="p-small"><span style="color:{MUTED}">target mix 39%</span></p>'),
-        T("sk-s",
-          label("SALES-SOURCED") + "\n" +
-          hero(ref(S, "SALES_ACV", "$,.2s"), ORANGE, 32) + "\n" +
-          f'<p class="p-small"><span style="color:{ORANGE}">Actual mix {ref(S,"SALES_MIX",".0%")}</span></p>\n'
-          f'<p class="p-small"><span style="color:{MUTED}">target mix 61%</span></p>'),
-        T("sk-t",
-          label("TOTAL STAGE 2+") + "\n" +
-          hero(ref(S, "SRC_TOTAL_ACV", "$,.2s"), INK, 32) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">Marketing + Sales open ACV</span></p>'),
-        T("sk-mix",
-          label("MIX · ACTUAL vs TARGET") + "\n" +
-          f'<p class="p-small" style="text-align:center"><span style="font-size:22px;color:{INK}">'
-          f'M {ref(S,"MKT_MIX",".0%")} / S {ref(S,"SALES_MIX",".0%")}</span></p>\n'
-          f'<p class="p-small" style="text-align:center"><span style="color:{MUTED}">target M 39% / S 61%</span></p>'),
+        open_kpi_plugin("plugin-mix", "mix"),
         T("sk-note",
-          f'<p class="p-small"><span style="color:{MUTED}">Open Stage 2+ by Lead Source · live from VW_PIPELINE · Q4 FY2026</span></p>'),
+          f'<p class="p-small"><span style="color:{MUTED}">Open Stage 2+ by Lead Source · same chart-tv KPI grain as ROTB · Q4 FY2026</span></p>'),
     ]
 
     # ═══════════════ MOVEMENT ═══════════════
@@ -503,9 +478,8 @@ def build():
         },
         T("data-note", """# Fast path
 
-8 DM SQL grains · each warehouse job once.
-VW split: closed-Q4 vs open (so ROTB won/lost does not wait on open scan).
-Pace + dual TV + funnel plugins subscribe to pass-through tables (no SumIf re-inline).
+7 SQL grains · open VW scanned once (chart-tv = charts + KPI grain); closed Q4 separate.
+Pace / funnel / TV / open-KPI plugins subscribe to pass-through tables (no SumIf re-inline).
 """),
     ]
 
@@ -540,15 +514,12 @@ Pace + dual TV + funnel plugins subscribe to pass-through tables (no SumIf re-in
         ]),
         Cont("sec-04", 1, 25, 23, 28, [
             L("rotb-s04", 1, 25, 1, 2),
-            Cont("dm-s0", 1, 7, 2, 6, [L("dm-s0-b", 1, 25, 1, 8)], 2),
-            Cont("dm-s1", 7, 13, 2, 6, [L("dm-s1-b", 1, 25, 1, 8)], 2),
-            Cont("dm-s2", 13, 19, 2, 6, [L("dm-s2-b", 1, 25, 1, 8)], 2),
+            Cont("dm-early", 1, 19, 2, 6, [L("plugin-early", 1, 25, 1, 8)], 2),
             Cont("dm-mo", 19, 25, 2, 6, [L("dm-mo-b", 1, 25, 1, 8)], 2),
         ]),
         Cont("sec-05", 1, 25, 28, 33, [
             L("rotb-s05", 1, 25, 1, 2),
-            Cont("sg-m", 1, 13, 2, 6, [L("rk-mkt", 1, 25, 1, 8)], 2),
-            Cont("sg-s", 13, 25, 2, 6, [L("rk-sales", 1, 25, 1, 8)], 2),
+            Cont("sg-src", 1, 25, 2, 6, [L("plugin-src", 1, 25, 1, 8)], 2),
         ]),
     ]
     open_l = [
@@ -565,7 +536,7 @@ Pace + dual TV + funnel plugins subscribe to pass-through tables (no SumIf re-in
             Cont("mv-walk-c", 15, 20, 3, 7, [L("mv-walk", 1, 25, 1, 8)], 2),
             Cont("mv-lost-c", 20, 25, 3, 7, [L("mv-lost", 1, 25, 1, 8)], 2),
             L("mv-also", 15, 25, 7, 8),
-            Cont("mv-early-c", 15, 20, 8, 12, [L("mv-early", 1, 25, 1, 8)], 2),
+            Cont("mv-early-c", 15, 20, 8, 12, [L("plugin-left", 1, 25, 1, 8)], 2),
             Cont("mv-won-c", 20, 25, 8, 12, [L("mv-won", 1, 25, 1, 8)], 2),
             L("mv-add", 15, 25, 12, 13),
             Cont("mv-cr-c", 15, 20, 13, 17, [L("mv-cr", 1, 25, 1, 8)], 2),
@@ -582,12 +553,7 @@ Pace + dual TV + funnel plugins subscribe to pass-through tables (no SumIf re-in
     ]
     sourcing_l = [
         E("sourcing-title", 1, 18, 1, 3), E("ctrl-period", 18, 25, 1, 3),
-        Cont("sc-row", 1, 25, 3, 12, [
-            Cont("sc-m-card", 1, 7, 1, 10, [L("sk-m", 1, 25, 1, 9)], 2),
-            Cont("sc-s-card", 7, 13, 1, 10, [L("sk-s", 1, 25, 1, 9)], 2),
-            Cont("sc-t-card", 13, 19, 1, 10, [L("sk-t", 1, 25, 1, 9)], 2),
-            Cont("sc-mix-card", 19, 25, 1, 10, [L("sk-mix", 1, 25, 1, 9)], 2),
-        ]),
+        E("plugin-mix", 1, 25, 3, 12),
         E("sk-note", 1, 25, 12, 14),
     ]
     movement_l = [
@@ -626,7 +592,7 @@ Pace + dual TV + funnel plugins subscribe to pass-through tables (no SumIf re-in
     ]
     data_l = [E("data-note", 1, 25, 1, 6)]
     row = 6
-    for wid in ["wb-pack", "wb-walkin", "wb-closed", "wb-open", "wb-funnel", "wb-tv"]:
+    for wid in ["wb-pack", "wb-walkin", "wb-closed", "wb-funnel", "wb-tv"]:
         data_l.append(E(wid, 1, 25, row, row + 3))
         row += 3
 

@@ -133,36 +133,6 @@ WHERE "Is Closed"
   AND "Close Date" >= '2026-10-01' AND "Close Date" < '2027-01-01'
 """
 
-    # 3b) Open only — sourcing + early stage (no closed rows in the scan)
-    open_vw = """
-SELECT
-  COALESCE(SUM(IFF(LEFT("Stage Name",1) IN ('2','3','4','5','6','7')
-    AND "Lead Source"='Marketing' AND FCST_NETACV BETWEEN 0 AND 5000000, FCST_NETACV, 0)),0) AS MKT_ACV,
-  COALESCE(SUM(IFF(LEFT("Stage Name",1) IN ('2','3','4','5','6','7')
-    AND "Lead Source"='Sales Generated' AND FCST_NETACV BETWEEN 0 AND 5000000, FCST_NETACV, 0)),0) AS SALES_ACV,
-  COUNT(DISTINCT IFF(LEFT("Stage Name",1)='0', ID, NULL)) AS S0_OPPS,
-  COALESCE(SUM(IFF(LEFT("Stage Name",1)='0'
-    AND FCST_NETACV BETWEEN 0 AND 5000000, FCST_NETACV, 0)),0) AS S0_ACV,
-  COUNT(DISTINCT IFF(LEFT("Stage Name",1)='1', ID, NULL)) AS S1_OPPS,
-  COALESCE(SUM(IFF(LEFT("Stage Name",1)='1'
-    AND FCST_NETACV BETWEEN 0 AND 5000000, FCST_NETACV, 0)),0) AS S1_ACV,
-  COUNT(DISTINCT IFF(LEFT("Stage Name",1)='2', ID, NULL)) AS S2_OPPS,
-  COALESCE(SUM(IFF(LEFT("Stage Name",1)='2'
-    AND FCST_NETACV BETWEEN 0 AND 5000000, FCST_NETACV, 0)),0) AS S2_ACV
-FROM BI_PRESENTATION.REPORT.VW_PIPELINE
-WHERE NOT "Is Closed" AND LEFT("Stage Name",1) IN ('0','1','2','3','4','5','6','7')
-"""
-    open_vw = f"""
-WITH b AS (
-{open_vw.strip()}
-)
-SELECT b.*,
-  b.MKT_ACV + b.SALES_ACV AS SRC_TOTAL_ACV,
-  IFF(b.MKT_ACV + b.SALES_ACV > 0, b.MKT_ACV/(b.MKT_ACV + b.SALES_ACV), 0) AS MKT_MIX,
-  IFF(b.MKT_ACV + b.SALES_ACV > 0, b.SALES_ACV/(b.MKT_ACV + b.SALES_ACV), 0) AS SALES_MIX
-FROM b
-"""
-
     # 4) Funnel — Q4 open stages only (ACV metrics)
     funnel = """
 SELECT STAGE,
@@ -186,10 +156,12 @@ WHERE METRIC_NAME='Forecasted Net ACV' AND STAGE_2_ATTAINED
 GROUP BY 1
 """
 
-    # 6) ONE VW open scan → segment + product + source chart rows
+    # 6) ONE VW open scan → charts (SEG/PROD/SRC) + KPI grain (early + sourcing)
+    # Workbook derives 1-row KPI Open from this grain (no second open VW scan).
     charts = """
-WITH open_rows AS (
+WITH open_all AS (
   SELECT
+    LEFT("Stage Name",1) AS STAGE_N,
     CASE
       WHEN CONTAINS("Segment",'Core') THEN 'Core'
       WHEN CONTAINS("Segment",'Mid') OR "Segment"='MM' THEN 'Mid-Market'
@@ -209,16 +181,31 @@ WITH open_rows AS (
     CASE WHEN FCST_NETACV BETWEEN 0 AND 5000000 THEN FCST_NETACV ELSE 0 END AS ACV,
     ID
   FROM BI_PRESENTATION.REPORT.VW_PIPELINE
-  WHERE NOT "Is Closed" AND LEFT("Stage Name",1) IN ('2','3','4','5','6','7')
+  WHERE NOT "Is Closed" AND LEFT("Stage Name",1) IN ('0','1','2','3','4','5','6','7')
+),
+open_27 AS (
+  SELECT * FROM open_all WHERE STAGE_N IN ('2','3','4','5','6','7')
 ),
 seg_act AS (
-  SELECT SEG AS DIM, COALESCE(SUM(ACV),0) AS ACTUAL FROM open_rows WHERE SEG <> 'Other' GROUP BY 1
+  SELECT SEG AS DIM, COALESCE(SUM(ACV),0) AS ACTUAL FROM open_27 WHERE SEG <> 'Other' GROUP BY 1
 ),
 prod_act AS (
-  SELECT PGRP AS DIM, COALESCE(SUM(ACV),0) AS ACTUAL FROM open_rows GROUP BY 1
+  SELECT PGRP AS DIM, COALESCE(SUM(ACV),0) AS ACTUAL FROM open_27 GROUP BY 1
 ),
 src_act AS (
-  SELECT SRC AS DIM, COUNT(DISTINCT ID) AS OPPS, COALESCE(SUM(ACV),0) AS ACTUAL FROM open_rows GROUP BY 1
+  SELECT SRC AS DIM, COUNT(DISTINCT ID) AS OPPS, COALESCE(SUM(ACV),0) AS ACTUAL FROM open_27 GROUP BY 1
+),
+kpi AS (
+  SELECT
+    COALESCE(SUM(IFF(STAGE_N IN ('2','3','4','5','6','7') AND SRC='Marketing', ACV, 0)),0) AS MKT_ACV,
+    COALESCE(SUM(IFF(STAGE_N IN ('2','3','4','5','6','7') AND SRC='Sales', ACV, 0)),0) AS SALES_ACV,
+    COUNT(DISTINCT IFF(STAGE_N='0', ID, NULL)) AS S0_OPPS,
+    COALESCE(SUM(IFF(STAGE_N='0', ACV, 0)),0) AS S0_ACV,
+    COUNT(DISTINCT IFF(STAGE_N='1', ID, NULL)) AS S1_OPPS,
+    COALESCE(SUM(IFF(STAGE_N='1', ACV, 0)),0) AS S1_ACV,
+    COUNT(DISTINCT IFF(STAGE_N='2', ID, NULL)) AS S2_OPPS,
+    COALESCE(SUM(IFF(STAGE_N='2', ACV, 0)),0) AS S2_ACV
+  FROM open_all
 )
 SELECT 'SEG' AS GRAIN, t.DIM, 'Target' AS SERIES, t.TARGET AS VAL, NULL::FLOAT AS OPPS
 FROM (
@@ -238,6 +225,16 @@ UNION ALL
 SELECT 'PROD', a.DIM, 'Actual', a.ACTUAL, NULL FROM prod_act a
 UNION ALL
 SELECT 'SRC', a.DIM, 'Actual', a.ACTUAL, a.OPPS::FLOAT FROM src_act a
+UNION ALL
+SELECT 'KPI', 'MKT', 'Actual', k.MKT_ACV, NULL FROM kpi k
+UNION ALL
+SELECT 'KPI', 'SALES', 'Actual', k.SALES_ACV, NULL FROM kpi k
+UNION ALL
+SELECT 'KPI', 'S0', 'Actual', k.S0_ACV, k.S0_OPPS::FLOAT FROM kpi k
+UNION ALL
+SELECT 'KPI', 'S1', 'Actual', k.S1_ACV, k.S1_OPPS::FLOAT FROM kpi k
+UNION ALL
+SELECT 'KPI', 'S2', 'Actual', k.S2_ACV, k.S2_OPPS::FLOAT FROM kpi k
 """
 
     pack_cols = [
@@ -256,12 +253,6 @@ SELECT 'SRC', a.DIM, 'Actual', a.ACTUAL, a.OPPS::FLOAT FROM src_act a
     closed_cols = [
         ("WON_ACV", m()), ("WON_OPPS", None), ("LOST_ACV", m()), ("LOST_OPPS", None),
     ]
-    open_cols = [
-        ("MKT_ACV", m()), ("SALES_ACV", m()),
-        ("S0_OPPS", None), ("S0_ACV", m()), ("S1_OPPS", None), ("S1_ACV", m()),
-        ("S2_OPPS", None), ("S2_ACV", m()),
-        ("SRC_TOTAL_ACV", m()), ("MKT_MIX", p()), ("SALES_MIX", p()),
-    ]
     # Daily open ACV trend — date-filtered snapshot (one job for Movement)
     snap = """
 SELECT SNAPSHOTDATE AS DT, COALESCE(SUM(FCST_NETACV),0) AS ACV
@@ -276,13 +267,13 @@ GROUP BY 1
         sql_table("kpi-pack", "KPI Pack", pack, pack_cols),
         sql_table("kpi-walkin", "KPI Walkin", walkin, [("WALKIN_OPPS", None), ("WALKIN_ACV", m())]),
         sql_table("kpi-closed", "KPI Closed Q4", closed, closed_cols),
-        sql_table("kpi-open-vw", "KPI Open VW", open_vw, open_cols),
+        # ONE open VW scan — charts + KPI grain (early/sourcing). Workbook reads KPIs via plugin.
+        sql_table("chart-tv", "Chart Target Actual Source", charts, [
+            ("GRAIN", None), ("DIM", None), ("SERIES", None), ("VAL", m()), ("OPPS", None)]),
         sql_table("chart-funnel", "Chart Funnel", funnel, [
             ("STAGE", None), ("ORD", None), ("ACV", m())]),
         sql_table("chart-created", "Chart Created", created_month, [
             ("MONTH", {"kind": "datetime", "formatString": "%b %Y"}), ("ACV", m())]),
-        sql_table("chart-tv", "Chart Target Actual Source", charts, [
-            ("GRAIN", None), ("DIM", None), ("SERIES", None), ("VAL", m()), ("OPPS", None)]),
         sql_table("chart-snap", "Chart Snapshot Trend", snap, [
             ("DT", {"kind": "datetime", "formatString": "%b %d"}), ("ACV", m())]),
     ]
@@ -296,7 +287,8 @@ def main():
         "schemaVersion": 1,
         "pages": [{"id": "page-main", "name": "Sources", "elements": els}],
     }
-    print("elements", len(els), "chars", sum(len(e["source"]["statement"]) for e in els))
+    nchar = sum(len(e.get("source", {}).get("statement") or "") for e in els)
+    print("elements", len(els), "sql_chars", nchar)
     print("PUT", api("PUT", f"/v2/dataModels/{DM}/spec", body))
     spec = api("GET", f"/v2/dataModels/{DM}/spec")
     by = {}

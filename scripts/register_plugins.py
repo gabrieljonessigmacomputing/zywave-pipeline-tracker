@@ -31,6 +31,13 @@ PLUGINS = [
         "url": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/tv-dual-v2/",
         "devUrl": "http://localhost:5173",
     },
+    {
+        "key": "openKpis",
+        "name": "Pipeline Tracker · Open KPI tiles",
+        "description": "Early-stage + sourcing KPI tiles from chart-tv KPI grain (no SumIf re-inline).",
+        "url": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/open-kpis-v2/",
+        "devUrl": "http://localhost:5173",
+    },
 ]
 
 
@@ -78,6 +85,7 @@ def main():
         "pace": ids["pace"],
         "funnel": ids["funnel"],
         "tv": ids["tv"],
+        "openKpis": ids["openKpis"],
         "urls": {p["key"]: p["url"] for p in PLUGINS},
     }
     path = os.path.abspath(OUT)
