@@ -418,6 +418,15 @@ def build():
           f'<p class="p-small"><span style="color:{ORANGE}">Created &amp; Closing This Q</span></p>\n'
           + hero(ref(P, "CREATED_CLOSING_ACV", "$,.2s"), ORANGE, 26) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"CREATED_CLOSING_OPPS",",.0f")} opps</span></p>'),
+        C("mv-pullin-c", GREEN_BG, "#bbf7d0"), C("mv-size-c", GREEN_BG, "#bbf7d0"),
+        T("mv-pullin",
+          f'<p class="p-small"><span style="color:{GREEN}">Pulled In (close date)</span></p>\n'
+          + hero("—", MUTED, 26) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">Needs snapshot delta · not in pack</span></p>'),
+        T("mv-size",
+          f'<p class="p-small"><span style="color:{GREEN}">Size Increases</span></p>\n'
+          + hero(ref(P, "OTHER_ADJ_ACV", "$,.2s"), GREEN, 26) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">Bridge residual proxy · pack</span></p>'),
         C("mv-walk-c", "#eff6ff", "#93c5fd"),
         T("mv-walk",
           f'<p class="p-small"><span style="color:{BLUE}">Walk-in baseline (Q4 start)</span></p>\n'
@@ -703,6 +712,8 @@ def build():
         T("mb-cr", label("+ CREATED") + "\n" + hero(ref(P, "Q4_CREATED_ACV", "$,.2s"), GREEN, 26)),
         T("mb-wn", label("− WON") + "\n" + hero(ref(P, "WON_ACV", "$,.2s"), GREEN, 26)),
         T("mb-ls", label("− LOST ≤$50k") + "\n" + hero(ref(P, "LOST_ACV", "$,.2s"), RED, 26)),
+        C("mb-adj", AMBER_BG, "#fbbf24"),
+        T("mb-adj-b", label("+ OTHER ADJ") + "\n" + hero(ref(P, "OTHER_ADJ_ACV", "$,.2s"), ORANGE, 26)),
         T("mb-q4", label("= Q4 OPEN") + "\n" + hero(ref(P, "Q4_ACV", "$,.2s"), BLUE, 26)),
         T("mv-snap-note",
           f'<p class="p-small"><span style="color:{MUTED}">Daily snapshot / 30-day delta / YoY lines need BI_STAGING.SNAPSHOT — '
@@ -954,7 +965,7 @@ Coverage / ABM = pack chrome (no open-VW). No daily snapshot grain.
             L("ok-q4tot", 1, 25, 1, 3),
             L("plugin-funnel", 1, 25, 3, 16),
         ]),
-        Cont("okc-mv", 13, 25, 14, 30, [
+        Cont("okc-mv", 13, 25, 14, 34, [
             L("mv-left", 1, 25, 1, 2),
             Cont("mv-push-c", 1, 13, 2, 6, [L("mv-push", 1, 25, 1, 2)], 2),
             Cont("mv-lost-c", 13, 25, 2, 6, [L("mv-lost", 1, 25, 1, 2)], 2),
@@ -964,15 +975,17 @@ Coverage / ABM = pack chrome (no open-VW). No daily snapshot grain.
             L("mv-add", 1, 25, 11, 12),
             Cont("mv-cr-c", 1, 13, 12, 16, [L("mv-cr", 1, 25, 1, 2)], 2),
             Cont("mv-ccq-c", 13, 25, 12, 16, [L("mv-ccq", 1, 25, 1, 2)], 2),
-            Cont("mv-walk-c", 1, 25, 16, 19, [L("mv-walk", 1, 25, 1, 2)], 2),
+            Cont("mv-pullin-c", 1, 13, 16, 20, [L("mv-pullin", 1, 25, 1, 2)], 2),
+            Cont("mv-size-c", 13, 25, 16, 20, [L("mv-size", 1, 25, 1, 2)], 2),
+            Cont("mv-walk-c", 1, 25, 20, 23, [L("mv-walk", 1, 25, 1, 2)], 2),
         ]),
-        E("open-mo-h", 1, 25, 30, 32),
-        E("chart-closemo", 1, 25, 32, 44),
-        E("open-prod-h", 1, 25, 44, 46),
-        E("chart-product", 1, 25, 46, 56),
-        E("open-sum-h", 1, 25, 56, 58),
-        E("tbl-stage-sum", 1, 13, 58, 68),
-        E("tbl-prod-sum", 13, 25, 58, 68),
+        E("open-mo-h", 1, 25, 34, 36),
+        E("chart-closemo", 1, 25, 36, 48),
+        E("open-prod-h", 1, 25, 48, 50),
+        E("chart-product", 1, 25, 50, 60),
+        E("open-sum-h", 1, 25, 60, 62),
+        E("tbl-stage-sum", 1, 13, 62, 72),
+        E("tbl-prod-sum", 13, 25, 62, 72),
     ]
     total_l = [
         E("total-title", 1, 25, 1, 3),
@@ -1035,10 +1048,11 @@ Coverage / ABM = pack chrome (no open-VW). No daily snapshot grain.
         Cont("mc-cov-y", 1, 13, 18, 23, [L("mk-cov-y", 1, 25, 1, 2)]),
         Cont("mc-cov-q", 13, 25, 18, 23, [L("mk-cov-q", 1, 25, 1, 2)]),
         E("mv-bridge-h", 1, 25, 23, 25),
-        Cont("mb-w", 1, 6, 25, 31, [L("mb-walk", 1, 25, 1, 2)]),
-        Cont("mb-c", 6, 11, 25, 31, [L("mb-cr", 1, 25, 1, 2)]),
-        Cont("mb-won", 11, 16, 25, 31, [L("mb-wn", 1, 25, 1, 2)]),
-        Cont("mb-lost", 16, 21, 25, 31, [L("mb-ls", 1, 25, 1, 2)]),
+        Cont("mb-w", 1, 5, 25, 31, [L("mb-walk", 1, 25, 1, 2)]),
+        Cont("mb-c", 5, 9, 25, 31, [L("mb-cr", 1, 25, 1, 2)]),
+        Cont("mb-won", 9, 13, 25, 31, [L("mb-wn", 1, 25, 1, 2)]),
+        Cont("mb-lost", 13, 17, 25, 31, [L("mb-ls", 1, 25, 1, 2)]),
+        Cont("mb-adj", 17, 21, 25, 31, [L("mb-adj-b", 1, 25, 1, 2)]),
         Cont("mb-q", 21, 25, 25, 31, [L("mb-q4", 1, 25, 1, 2)]),
         E("mv-snap-note", 1, 25, 31, 33),
     ]
