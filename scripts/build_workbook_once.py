@@ -791,10 +791,6 @@ def build():
             "xAxis": {"columnId": "ccm-q"},
             "yAxis": {"columnIds": ["ccm-fy25", "ccm-fy26"]},
             "stacking": "none",
-            "color": {
-                "by": "series",
-                "palette": {"FY2025": "#94a3b8", "FY2026": "#38bdf8"},
-            },
             "style": {"backgroundColor": WHITE, "borderRadius": "round", "borderColor": BORDER, "borderWidth": 1},
         },
         {
