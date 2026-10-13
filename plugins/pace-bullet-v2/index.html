@@ -98,19 +98,29 @@
     var barPct = clamp01(pct);
     var paced = d.paced === null || d.paced === undefined ? null : clamp01(d.paced);
     var fillC = normColor(d.fillColor, "#f97316"), tickC = normColor(d.tickColor, "#334155");
+    // Stills: red when behind paced tick, green when ahead, orange otherwise
+    var statusC = fillC, arrow = "";
+    if (paced !== null && goal) {
+      if (pct + 0.005 < paced) { statusC = "#dc2626"; arrow = " ↓"; }
+      else if (pct > paced + 0.005) { statusC = "#16a34a"; arrow = " ↑"; }
+    }
     var through = paced !== null ? Math.round(paced * 100) + "% through period" : "";
+    var paceLabel = paced !== null
+      ? ((pct / (paced || 1e-9)) * 100).toFixed(1) + "% paced" + arrow
+      : "";
 
     var h = "";
     if (d.title) h += '<div class="title">' + esc(d.title) + '</div>';
     if (through) h += '<div class="foot" style="margin:0 0 2px">' + esc(through) + '</div>';
     h += '<div class="row"><span class="value">' + esc(fmt(actual, d.valueFormat)) + '</span>' +
-         '<span class="pct">' + (pct * 100).toFixed(1) + '% of goal</span></div>';
-    h += '<div class="track"><div class="fill" style="width:' + (barPct * 100).toFixed(2) + '%"></div>';
+         '<span class="pct" style="color:' + statusC + '">' + (pct * 100).toFixed(1) + '% of goal</span></div>';
+    h += '<div class="track"><div class="fill" style="width:' + (barPct * 100).toFixed(2) +
+         '%;background:' + statusC + '"></div>';
     if (paced !== null) h += '<div class="tick" style="left:' + (paced * 100).toFixed(2) + '%"></div>';
     h += '</div>';
     h += '<div class="foot">Target: <b>' + esc(fmt(goal, d.valueFormat)) + '</b>' +
-         (paced !== null ? ' · <b>' + Math.round(paced * 100) + '%</b> paced' : '') + '</div>';
-    root.style.setProperty("--fill", fillC);
+         (paceLabel ? ' · <b style="color:' + statusC + '">' + esc(paceLabel) + '</b>' : '') + '</div>';
+    root.style.setProperty("--fill", statusC);
     root.style.setProperty("--tick", tickC);
     root.innerHTML = h;
   }
