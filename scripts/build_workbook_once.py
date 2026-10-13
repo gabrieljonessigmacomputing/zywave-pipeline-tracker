@@ -255,29 +255,21 @@ def build():
           hero(ref(P, "CREATED_CLOSING_ACV", "$,.2s"), ORANGE, 32) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"CREATED_CLOSING_OPPS",",.0f")} opportunities</span></p>'),
         T("rk-cwq",
-          label("CREATED & WON THIS QUARTER") + "\n" +
-          hero(ref(Z, "WON_ACV", "$,.2s"), GREEN, 32) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">{ref(Z,"WON_OPPS",",.0f")} opportunities</span></p>'),
+          label("AVG DEAL SIZE") + "\n" +
+          hero(ref(P, "AVG_DEAL", "$,.2s"), GREEN, 32) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">Open Stage 2+ · pack grain</span></p>'),
         T("rotb-s02", f'## <span style="color:{TEAL}">02 / COVERAGE</span>\nOpen pipeline'),
         C("cov-1", TEAL_BG, "#99f6e4"), C("cov-2"), C("cov-3"), C("cov-4"),
         T("rk-open", label("TOTAL OPEN PIPELINE") + "\n" + hero(ref(P, "TOTAL_ACV", "$,.2s"), TEAL, 32)),
         T("rk-cq", label("CLOSING THIS QUARTER") + "\n" + hero(ref(P, "Q4_ACV", "$,.2s"), BLUE, 32)),
         T("rk-nq", label("CLOSING NEXT QUARTER") + "\n" + hero(ref(P, "NQ_ACV", "$,.2s"), BLUE, 32)),
         T("rk-2q", label("CLOSING TWO QUARTERS OUT") + "\n" + hero(ref(P, "Q2OUT_ACV", "$,.2s"), BLUE, 32)),
-        T("rotb-s03", f'## <span style="color:{MUTED}">03 / PIPELINE MANAGEMENT</span>\nQ4 movement'),
-        C("mgmt-w"), C("mgmt-l", RED_BG, "#fecaca"), C("mgmt-n", GREEN_BG, "#bbf7d0"),
+        T("rotb-s03", f'## <span style="color:{MUTED}">03 / PIPELINE MANAGEMENT</span>\nQ4 walk-in (closed won/lost on Open · Movement)'),
+        C("mgmt-w"),
         T("rk-walk",
           label("WALK-IN (Q4 START)") + "\n" +
           hero(ref(W, "WALKIN_ACV", "$,.2s"), BLUE, 28) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">Frozen · {ref(W,"WALKIN_OPPS",",.0f")} opps</span></p>'),
-        T("rk-lost",
-          label("CLOSED LOST") + "\n" +
-          hero(ref(Z, "LOST_ACV", "$,.2s"), RED, 28) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">{ref(Z,"LOST_OPPS",",.0f")} opps · ≤ $50k</span></p>'),
-        T("rk-won2",
-          label("CLOSED WON") + "\n" +
-          hero(ref(Z, "WON_ACV", "$,.2s"), GREEN, 28) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">{ref(Z,"WON_OPPS",",.0f")} opportunities</span></p>'),
+          f'<p class="p-small"><span style="color:{MUTED}">Frozen · {ref(W,"WALKIN_OPPS",",.0f")} opps · closed detail on Open / Movement</span></p>'),
         T("rotb-s04", f'## <span style="color:{BLUE}">04 / EARLY STAGE PIPELINE</span>\nOpen Stage 0–2 · Snowflake SoT'),
         C("dm-s0"), C("dm-s1"), C("dm-s2", TEAL_BG, "#5eead4"), C("dm-mo"),
         T("dm-s0-b",
@@ -539,9 +531,7 @@ TV charts = ACV product + lean VW segment (Total page). No open-KPI plugins. No 
         ]),
         Cont("sec-03", 1, 25, 18, 23, [
             L("rotb-s03", 1, 25, 1, 2),
-            Cont("mgmt-w", 1, 9, 2, 6, [L("rk-walk", 1, 25, 1, 8)], 2),
-            Cont("mgmt-l", 9, 17, 2, 6, [L("rk-lost", 1, 25, 1, 8)], 2),
-            Cont("mgmt-n", 17, 25, 2, 6, [L("rk-won2", 1, 25, 1, 8)], 2),
+            Cont("mgmt-w", 1, 25, 2, 6, [L("rk-walk", 1, 25, 1, 8)], 2),
         ]),
         Cont("sec-04", 1, 25, 23, 28, [
             L("rotb-s04", 1, 25, 1, 2),
