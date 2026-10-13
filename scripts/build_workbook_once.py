@@ -406,7 +406,7 @@ def build():
 
     # ═══════════════ MOVEMENT ═══════════════
     els += [
-        T("movement-title", f'# Pipeline Movement\n<p class="p-small"><span style="color:{MUTED}">Q4 closed from ACV metrics · 14-day snapshot trend</span></p>'),
+        T("movement-title", f'# Pipeline Movement\n<p class="p-small"><span style="color:{MUTED}">ACV-fast · Q4 closed won/lost in pack grain · walk-in snapshot</span></p>'),
         C("mc-1"), C("mc-2"), C("mc-3"), C("mc-4", GREEN_BG, "#bbf7d0"), C("mc-5", RED_BG, "#fecaca"), C("mc-6", AMBER_BG, "#fbbf24"),
         T("mk-open", label("TOTAL OPEN PIPELINE") + "\n" + hero(ref(P, "TOTAL_ACV", "$,.0f"), INK, 32)),
         T("mk-q4",
@@ -423,7 +423,14 @@ def build():
           hero(ref(P, "LOST_ACV", "$,.0f"), RED, 32) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"LOST_OPPS",",.0f")} opps · ≤ $50k</span></p>'),
         T("mk-created", label("CREATED Q4") + "\n" + hero(ref(P, "Q4_CREATED_ACV", "$,.0f"), ORANGE, 32)),
-        T("mv-trend-h", f'## Daily open pipeline\n<span style="color:{MUTED}">Last 14 days · Stage 2+ forecasted net ACV</span>'),
+        T("mv-bridge-h", f'## Q4 bridge\n<span style="color:{MUTED}">Walk-in + created − won − lost (pack + walk-in · no daily snapshot VW)</span>'),
+        C("mb-w"), C("mb-c", GREEN_BG, "#bbf7d0"), C("mb-won", GREEN_BG, "#bbf7d0"), C("mb-lost", RED_BG, "#fecaca"), C("mb-q", "#eff6ff", "#93c5fd"),
+        T("mb-walk", label("WALK-IN") + "\n" + hero(ref(W, "WALKIN_ACV", "$,.2s"), TEAL, 26)),
+        T("mb-cr", label("+ CREATED") + "\n" + hero(ref(P, "Q4_CREATED_ACV", "$,.2s"), GREEN, 26)),
+        T("mb-wn", label("− WON") + "\n" + hero(ref(P, "WON_ACV", "$,.2s"), GREEN, 26)),
+        T("mb-ls", label("− LOST ≤$50k") + "\n" + hero(ref(P, "LOST_ACV", "$,.2s"), RED, 26)),
+        T("mb-q4", label("= Q4 OPEN") + "\n" + hero(ref(P, "Q4_ACV", "$,.2s"), BLUE, 26)),
+        # Optional slow trend — Data page only (chart-snap).
         {
             "id": "chart-snap", "kind": "line-chart", "name": "Open Pipeline Snapshot Trend",
             "source": dm("chart-snap"),
@@ -591,8 +598,12 @@ Movement trend = 14-day snapshot VW. TV = ACV product; segment targets on Total.
         Cont("mc-4", 1, 9, 8, 13, [L("mk-won", 1, 25, 1, 8)]),
         Cont("mc-5", 9, 17, 8, 13, [L("mk-lost", 1, 25, 1, 8)]),
         Cont("mc-6", 17, 25, 8, 13, [L("mk-created", 1, 25, 1, 8)]),
-        E("mv-trend-h", 1, 25, 13, 15),
-        E("chart-snap", 1, 25, 15, 26),
+        E("mv-bridge-h", 1, 25, 13, 15),
+        Cont("mb-w", 1, 6, 15, 22, [L("mb-walk", 1, 25, 1, 8)]),
+        Cont("mb-c", 6, 11, 15, 22, [L("mb-cr", 1, 25, 1, 8)]),
+        Cont("mb-won", 11, 16, 15, 22, [L("mb-wn", 1, 25, 1, 8)]),
+        Cont("mb-lost", 16, 21, 15, 22, [L("mb-ls", 1, 25, 1, 8)]),
+        Cont("mb-q", 21, 25, 15, 22, [L("mb-q4", 1, 25, 1, 8)]),
     ]
     created_l = [
         E("created-title", 1, 25, 1, 3),
@@ -618,6 +629,14 @@ Movement trend = 14-day snapshot VW. TV = ACV product; segment targets on Total.
     for wid in ["wb-pack", "wb-walkin", "wb-open", "wb-src", "wb-funnel", "wb-tv"]:
         data_l.append(E(wid, 1, 25, row, row + 3))
         row += 3
+    data_l += [
+        E("mv-trend-h", 1, 25, row, row + 2),
+        E("chart-snap", 1, 25, row + 2, row + 14),
+    ]
+    # keep heading element for data page snap
+    els += [
+        T("mv-trend-h", f'## Daily open pipeline (optional)\n<span style="color:{MUTED}">Last 14 days · snapshot VW · kept off Movement for speed</span>'),
+    ]
 
     layout = "\n".join([
         '<?xml version="1.0" encoding="utf-8"?>',
