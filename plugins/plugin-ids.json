@@ -4,9 +4,9 @@
   "tv": "8e375e9e-e9d8-45fb-a001-ca7c974e0f35",
   "openKpis": "45fc44ec-67b1-43b2-88ff-1fb5a5d515d7",
   "urls": {
-    "pace": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/pace-bullet-v2/",
-    "funnel": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/stage-funnel-v2/",
-    "tv": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/tv-dual-v4/",
-    "openKpis": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/open-kpis-v3/"
+    "pace": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/pace-bullet/",
+    "funnel": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/stage-funnel/",
+    "tv": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/tv-dual/",
+    "openKpis": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/open-kpis/"
   }
 }

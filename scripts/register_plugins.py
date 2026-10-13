@@ -14,28 +14,29 @@ PLUGINS = [
         "key": "pace",
         "name": "Pipeline Tracker · Goal pace bar",
         "description": "ROTB creation pace: orange fill (actual/goal) + dark paced tick.",
-        "url": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/pace-bullet-v2/",
+        # Canonical paths — Sigma PATCH often ignores URL changes; overwrite these dirs on deploy.
+        "url": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/pace-bullet/",
         "devUrl": "http://localhost:5173",
     },
     {
         "key": "funnel",
         "name": "Pipeline Tracker · Stage funnel",
         "description": "Tapered Stage 2–7 open-pipeline funnel.",
-        "url": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/stage-funnel-v2/",
+        "url": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/stage-funnel/",
         "devUrl": "http://localhost:5173",
     },
     {
         "key": "tv",
         "name": "Pipeline Tracker · Target vs Actual dual",
         "description": "Segment + product Target vs Actual from one chart-tv grain (single warehouse job).",
-        "url": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/tv-dual-v4/",
+        "url": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/tv-dual/",
         "devUrl": "http://localhost:5173",
     },
     {
         "key": "openKpis",
         "name": "Pipeline Tracker · Open KPI tiles",
         "description": "Early-stage + sourcing KPI tiles from chart-tv KPI grain (no SumIf re-inline).",
-        "url": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/open-kpis-v3/",
+        "url": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/open-kpis/",
         "devUrl": "http://localhost:5173",
     },
 ]

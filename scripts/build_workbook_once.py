@@ -127,12 +127,16 @@ def build():
         pass_tbl("wb-closed", "WB Closed", "kpi-closed", "KPI Closed Q4", [
             ("WON_ACV", m()), ("WON_OPPS", None), ("LOST_ACV", m()), ("LOST_OPPS", None),
         ]),
-        # 1-row open KPIs → text {{[WB Open/…]}} only (no SumIf, no KPI plugins).
+        # Early stages (ACV) — text {{[WB Open/…]}}; never waits on VW.
         pass_tbl("wb-open", "WB Open", "kpi-open", "KPI Open", [
-            ("MKT_ACV", m()), ("SALES_ACV", m()),
             ("S0_OPPS", None), ("S0_ACV", m()), ("S1_OPPS", None), ("S1_ACV", m()),
             ("S2_OPPS", None), ("S2_ACV", m()),
-            ("SRC_TOTAL_ACV", m()), ("MKT_MIX", p()), ("SALES_MIX", p()),
+        ]),
+        # Sourcing mix (1-row VW) — isolated so early cards stay fast.
+        pass_tbl("wb-src", "WB Sourcing", "kpi-src", "KPI Sourcing", [
+            ("MKT_ACV", m()), ("SALES_ACV", m()), ("SRC_TOTAL_ACV", m()),
+            ("MKT_MIX", p()), ("SALES_MIX", p()),
+            ("SEG_CORE", m()), ("SEG_MID", m()), ("SEG_ENT", m()),
         ]),
         pass_tbl("wb-funnel", "WB Funnel", "chart-funnel", "Chart Funnel",
                  [("STAGE", None), ("ORD", None), ("ACV", m())]),
@@ -149,7 +153,7 @@ def build():
     plug = load_plugin_ids()
     PACE_ID, FUNNEL_ID, TV_ID = plug["pace"], plug["funnel"], plug["tv"]
     P, W = "WB Pack", "WB Walkin"
-    Z, O = "WB Closed", "WB Open"
+    Z, O, S = "WB Closed", "WB Open", "WB Sourcing"
 
     def ref(table, col, fmt):
         return "{{" + f"[{table}/{col}] | {fmt}" + "}}"
@@ -183,8 +187,8 @@ def build():
             "style": {"backgroundColor": WHITE},
         }
 
-    def tv_plugin(eid, src_eid="wb-tv"):
-        # One warehouse job → dual charts + attainment table + sourcing mix (client-side).
+    def tv_plugin(eid, src_eid="wb-tv", kpi_eid="wb-src"):
+        # ACV chart grain + 1-row VW kpi grain (SEG/SRC actuals) — no second VW in chart-tv.
         return {
             "id": eid, "kind": "plugin", "pluginId": TV_ID, "displayName": "Target vs Actual",
             "config": {
@@ -194,6 +198,12 @@ def build():
                 "series": {"kind": "column", "columnId": f"{src_eid}-2", "source": "source"},
                 "val": {"kind": "column", "columnId": f"{src_eid}-3", "source": "source"},
                 "opps": {"kind": "column", "columnId": f"{src_eid}-4", "source": "source"},
+                "kpiSource": {"kind": "element", "elementId": kpi_eid},
+                "mkt": {"kind": "column", "columnId": f"{kpi_eid}-0", "source": "kpiSource"},
+                "sales": {"kind": "column", "columnId": f"{kpi_eid}-1", "source": "kpiSource"},
+                "segCore": {"kind": "column", "columnId": f"{kpi_eid}-5", "source": "kpiSource"},
+                "segMid": {"kind": "column", "columnId": f"{kpi_eid}-6", "source": "kpiSource"},
+                "segEnt": {"kind": "column", "columnId": f"{kpi_eid}-7", "source": "kpiSource"},
             },
             "style": {"backgroundColor": WHITE},
         }
@@ -289,13 +299,13 @@ def build():
         C("sg-m"), C("sg-s"),
         T("rk-mkt",
           label("MARKETING-SOURCED") + "\n" +
-          hero(ref(O, "MKT_ACV", "$,.2s"), BLUE, 32) + "\n" +
-          f'<p class="p-small"><span style="color:{BLUE}">Actual mix {ref(O,"MKT_MIX",".0%")}</span></p>\n'
+          hero(ref(S, "MKT_ACV", "$,.2s"), BLUE, 32) + "\n" +
+          f'<p class="p-small"><span style="color:{BLUE}">Actual mix {ref(S,"MKT_MIX",".0%")}</span></p>\n'
           f'<p class="p-small"><span style="color:{MUTED}">target mix 39%</span></p>'),
         T("rk-sales",
           label("SALES-SOURCED") + "\n" +
-          hero(ref(O, "SALES_ACV", "$,.2s"), ORANGE, 32) + "\n" +
-          f'<p class="p-small"><span style="color:{ORANGE}">Actual mix {ref(O,"SALES_MIX",".0%")}</span></p>\n'
+          hero(ref(S, "SALES_ACV", "$,.2s"), ORANGE, 32) + "\n" +
+          f'<p class="p-small"><span style="color:{ORANGE}">Actual mix {ref(S,"SALES_MIX",".0%")}</span></p>\n'
           f'<p class="p-small"><span style="color:{MUTED}">target mix 61%</span></p>'),
         T("rotb-progress",
           f'<p class="p-small"><span style="color:{MUTED}">Year progress {ref(P,"YEAR_ELAPSED",".0%")} · '
@@ -387,22 +397,22 @@ def build():
         C("sc-m-card"), C("sc-s-card"), C("sc-t-card"), C("sc-mix-card", AMBER_BG, "#fbbf24"),
         T("sk-m",
           label("MARKETING-SOURCED") + "\n" +
-          hero(ref(O, "MKT_ACV", "$,.2s"), BLUE, 32) + "\n" +
-          f'<p class="p-small"><span style="color:{BLUE}">Actual mix {ref(O,"MKT_MIX",".0%")}</span></p>\n'
+          hero(ref(S, "MKT_ACV", "$,.2s"), BLUE, 32) + "\n" +
+          f'<p class="p-small"><span style="color:{BLUE}">Actual mix {ref(S,"MKT_MIX",".0%")}</span></p>\n'
           f'<p class="p-small"><span style="color:{MUTED}">target mix 39%</span></p>'),
         T("sk-s",
           label("SALES-SOURCED") + "\n" +
-          hero(ref(O, "SALES_ACV", "$,.2s"), ORANGE, 32) + "\n" +
-          f'<p class="p-small"><span style="color:{ORANGE}">Actual mix {ref(O,"SALES_MIX",".0%")}</span></p>\n'
+          hero(ref(S, "SALES_ACV", "$,.2s"), ORANGE, 32) + "\n" +
+          f'<p class="p-small"><span style="color:{ORANGE}">Actual mix {ref(S,"SALES_MIX",".0%")}</span></p>\n'
           f'<p class="p-small"><span style="color:{MUTED}">target mix 61%</span></p>'),
         T("sk-t",
           label("TOTAL STAGE 2+") + "\n" +
-          hero(ref(O, "SRC_TOTAL_ACV", "$,.2s"), INK, 32) + "\n" +
+          hero(ref(S, "SRC_TOTAL_ACV", "$,.2s"), INK, 32) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">Marketing + Sales open ACV</span></p>'),
         T("sk-mix",
           label("MIX · ACTUAL vs TARGET") + "\n" +
           f'<p class="p-small" style="text-align:center"><span style="font-size:22px;color:{INK}">'
-          f'M {ref(O,"MKT_MIX",".0%")} / S {ref(O,"SALES_MIX",".0%")}</span></p>\n'
+          f'M {ref(S,"MKT_MIX",".0%")} / S {ref(S,"SALES_MIX",".0%")}</span></p>\n'
           f'<p class="p-small" style="text-align:center"><span style="color:{MUTED}">target M 39% / S 61%</span></p>'),
         T("sk-note",
           f'<p class="p-small"><span style="color:{MUTED}">1-row KPI Open · text heroes · Q4 FY2026</span></p>'),
@@ -631,7 +641,7 @@ TV charts = ACV product + lean VW segment (Total page). No open-KPI plugins. No 
     ]
     data_l = [E("data-note", 1, 25, 1, 6)]
     row = 6
-    for wid in ["wb-pack", "wb-walkin", "wb-closed", "wb-open", "wb-funnel", "wb-tv"]:
+    for wid in ["wb-pack", "wb-walkin", "wb-closed", "wb-open", "wb-src", "wb-funnel", "wb-tv"]:
         data_l.append(E(wid, 1, 25, row, row + 3))
         row += 3
 

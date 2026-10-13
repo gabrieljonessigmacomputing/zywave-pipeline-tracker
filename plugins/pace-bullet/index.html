@@ -119,11 +119,6 @@
     root.innerHTML = '<div class="wait">' + esc(msg || "Waiting for workbook data…") + '</div>';
   }
 
-  function synth() {
-    return { title: "Year Pipeline Created", actual: 1840000, goal: 3000000, paced: 0.72,
-             valueFormat: "$,.2s", fillColor: null, tickColor: null };
-  }
-
   function getClient() {
     return (window.SigmaPlugin && window.SigmaPlugin.client)
       || (window.sigma && window.sigma.plugin && window.sigma.plugin.client)
@@ -135,8 +130,7 @@
 
   function render() {
     if (!CFG || !sourceId(CFG.source)) {
-      if (!LAST) draw(synth());
-      else draw(LAST);
+      waiting("Waiting for workbook data…");
       return;
     }
     var aKey = colKey(CFG.actual), gKey = colKey(CFG.goal);
@@ -184,8 +178,8 @@
   (function boot() {
     var client = getClient();
     if (client) { wire(client); return; }
-    if (++tries < 40) { setTimeout(boot, 50); return; }
-    draw(synth());
+    if (++tries < 80) { setTimeout(boot, 50); return; }
+    waiting("Plugin SDK failed to load. Refresh the page.");
   })();
 })();
 </script>

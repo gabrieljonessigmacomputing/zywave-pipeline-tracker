@@ -100,17 +100,6 @@
     stage.innerHTML = '<div class="wait">' + esc(msg || "Waiting for workbook data…") + '</div>';
   }
 
-  function synth() {
-    return [
-      { stage: "2 - Analysis", acv: 5200000 },
-      { stage: "3 - Executive Alignment", acv: 4100000 },
-      { stage: "4 - Solution Validation", acv: 3000000 },
-      { stage: "5 - Negotiate", acv: 2100000 },
-      { stage: "6 - Finance Hold", acv: 1300000 },
-      { stage: "7 - Finance Review", acv: 700000 }
-    ];
-  }
-
   function getClient() {
     return (window.SigmaPlugin && window.SigmaPlugin.client)
       || (window.sigma && window.sigma.plugin && window.sigma.plugin.client)
@@ -130,7 +119,7 @@
     client.config.subscribe(function (cfg) {
       if (unsub) { unsub(); unsub = null; }
       if (!cfg || !sourceId(cfg.source) || !colKey(cfg.stage) || !colKey(cfg.acv)) {
-        if (!LAST) draw(synth());
+        waiting("Waiting for workbook data…");
         return;
       }
       waiting("Loading funnel…");
@@ -161,8 +150,8 @@
   (function boot() {
     var client = getClient();
     if (client) { wire(client); return; }
-    if (++tries < 40) { setTimeout(boot, 50); return; }
-    draw(synth());
+    if (++tries < 80) { setTimeout(boot, 50); return; }
+    waiting("Plugin SDK failed to load. Refresh the page.");
   })();
 
   if (window.ResizeObserver) new ResizeObserver(function () { if (LAST) draw(LAST); }).observe(stage);

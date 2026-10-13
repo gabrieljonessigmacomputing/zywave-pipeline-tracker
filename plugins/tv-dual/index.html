@@ -202,26 +202,7 @@
       (sPct * 100).toFixed(0) + '% of mix · target 61%</div></div></div></div>';
   }
 
-  function synth() {
-    return [
-      { grain: "SEG", dim: "Core", series: "Target", val: 18000000 },
-      { grain: "SEG", dim: "Core", series: "Actual", val: 12000000 },
-      { grain: "SEG", dim: "Mid-Market", series: "Target", val: 16000000 },
-      { grain: "SEG", dim: "Mid-Market", series: "Actual", val: 9000000 },
-      { grain: "SEG", dim: "Enterprise", series: "Target", val: 20000000 },
-      { grain: "SEG", dim: "Enterprise", series: "Actual", val: 14000000 },
-      { grain: "PROD", dim: "Insurance Intelligence", series: "Target", val: 31000000 },
-      { grain: "PROD", dim: "Insurance Intelligence", series: "Actual", val: 22000000 },
-      { grain: "PROD", dim: "RQC & AMS", series: "Target", val: 22000000 },
-      { grain: "PROD", dim: "RQC & AMS", series: "Actual", val: 15000000 },
-      { grain: "PROD", dim: "Platform Sales", series: "Target", val: 1000000 },
-      { grain: "PROD", dim: "Platform Sales", series: "Actual", val: 800000 },
-      { grain: "SRC", dim: "Marketing", series: "Actual", val: 5500000, opps: 200 },
-      { grain: "SRC", dim: "Sales", series: "Actual", val: 8700000, opps: 400 },
-    ];
-  }
-
-  var LAST = null, LAYOUT = "charts", unsub = null;
+  var BASE = null, LAST = null, LAYOUT = "charts", unsub = null, unsubKpi = null, KPI = null;
 
   function parseKpi(rows) {
     var o = { MKT: 0, SALES: 0, S0: 0, S0o: 0, S1: 0, S1o: 0, S2: 0, S2o: 0 };
@@ -287,14 +268,39 @@
     root.innerHTML = h;
   }
 
-  function render(rows) {
-    if (!rows || !rows.length) {
+  function firstNum(data, key) {
+    if (!data || !key || !data[key] || !data[key].length) return null;
+    var n = Number(data[key][0]);
+    return isFinite(n) ? n : null;
+  }
+
+  function mergeKpi(rows) {
+    rows = (rows || []).slice();
+    if (!KPI) return rows;
+    function upsert(grain, dim, series, val) {
+      if (val == null) return;
+      var hit = rows.find(function (r) {
+        return r.grain === grain && r.dim === dim && r.series === series;
+      });
+      if (hit) hit.val = val;
+      else rows.push({ grain: grain, dim: dim, series: series, val: val, opps: null });
+    }
+    upsert("SEG", "Core", "Actual", KPI.segCore);
+    upsert("SEG", "Mid-Market", "Actual", KPI.segMid);
+    upsert("SEG", "Enterprise", "Actual", KPI.segEnt);
+    upsert("SRC", "Marketing", "Actual", KPI.mkt);
+    upsert("SRC", "Sales", "Actual", KPI.sales);
+    return rows;
+  }
+
+  function paint() {
+    if (!BASE || !BASE.length) {
       root.innerHTML = '<div style="padding:24px;color:#64748b;font-size:13px">Waiting for workbook data…</div>';
       return;
     }
-    LAST = rows;
+    LAST = mergeKpi(BASE);
     if (LAYOUT && LAYOUT !== "charts") {
-      renderKpi(LAYOUT, rows);
+      renderKpi(LAYOUT, LAST);
       return;
     }
     root.style.padding = "";
@@ -309,6 +315,12 @@
     drawPanel(document.getElementById("p-prod"), "Pipeline by Product Group: 2H Target vs Actual", prod);
   }
 
+  function render(rows) {
+    if (rows === null) { BASE = null; paint(); return; }
+    BASE = rows;
+    paint();
+  }
+
   function wire(client) {
     client.config.configureEditorPanel([
       { name: "source", type: "element" },
@@ -317,21 +329,40 @@
       { name: "series", type: "column", source: "source", allowedTypes: ["text"], label: "Series" },
       { name: "val", type: "column", source: "source", allowedTypes: ["number"], label: "Value" },
       { name: "opps", type: "column", source: "source", allowedTypes: ["number"], label: "Opps (optional)" },
-      // Reuse title (known-good text config) as layout selector: charts|early|src|mix|left
+      { name: "kpiSource", type: "element", label: "KPI row (SEG/SRC actuals)" },
+      { name: "mkt", type: "column", source: "kpiSource", allowedTypes: ["number"], label: "Marketing ACV" },
+      { name: "sales", type: "column", source: "kpiSource", allowedTypes: ["number"], label: "Sales ACV" },
+      { name: "segCore", type: "column", source: "kpiSource", allowedTypes: ["number"], label: "Seg Core" },
+      { name: "segMid", type: "column", source: "kpiSource", allowedTypes: ["number"], label: "Seg Mid" },
+      { name: "segEnt", type: "column", source: "kpiSource", allowedTypes: ["number"], label: "Seg Ent" },
       { name: "title", type: "text", label: "Layout / title", defaultValue: "charts" }
     ]);
     client.config.subscribe(function (cfg) {
       if (unsub) { unsub(); unsub = null; }
+      if (unsubKpi) { unsubKpi(); unsubKpi = null; }
+      KPI = null;
       var t = (cfg && cfg.title) || "charts";
       if (typeof t === "object") t = t.value || t.id || "charts";
       t = String(t || "charts").toLowerCase().trim();
       LAYOUT = /^(early|src|mix|left|rotb|charts)$/.test(t) ? t : "charts";
       if (!cfg || !sourceId(cfg.source) || !colKey(cfg.grain) || !colKey(cfg.dim) ||
           !colKey(cfg.series) || !colKey(cfg.val)) {
-        if (!LAST) render(synth());
+        render(null);
         return;
       }
       render(null);
+      if (sourceId(cfg.kpiSource)) {
+        unsubKpi = client.elements.subscribeToElementData(cfg.kpiSource, function (data) {
+          KPI = {
+            mkt: firstNum(data, colKey(cfg.mkt)),
+            sales: firstNum(data, colKey(cfg.sales)),
+            segCore: firstNum(data, colKey(cfg.segCore)),
+            segMid: firstNum(data, colKey(cfg.segMid)),
+            segEnt: firstNum(data, colKey(cfg.segEnt)),
+          };
+          paint();
+        });
+      }
       unsub = client.elements.subscribeToElementData(cfg.source, function (data) {
         var gk = colKey(cfg.grain), dk = colKey(cfg.dim), sk = colKey(cfg.series), vk = colKey(cfg.val);
         var ok = colKey(cfg.opps);
@@ -358,12 +389,12 @@
   (function boot() {
     var client = getClient();
     if (client) { wire(client); return; }
-    if (++tries < 40) { setTimeout(boot, 50); return; }
-    render(synth());
+    if (++tries < 80) { setTimeout(boot, 50); return; }
+    root.innerHTML = '<div style="padding:24px;color:#b91c1c;font-size:13px">Plugin SDK failed to load. Refresh the page.</div>';
   })();
 
-  if (window.ResizeObserver) new ResizeObserver(function () { if (LAST) render(LAST); }).observe(root);
-  else window.addEventListener("resize", function () { if (LAST) render(LAST); });
+  if (window.ResizeObserver) new ResizeObserver(function () { if (BASE) paint(); }).observe(root);
+  else window.addEventListener("resize", function () { if (BASE) paint(); });
 })();
 </script>
 </body>
