@@ -705,15 +705,16 @@ No daily snapshot grain — Movement uses pack bridge.
     # so it never steals auto-row tracks from the plugin cards.
     rotb = [
         E("rotb-title", 1, 18, 1, 3), E("rotb-badge", 18, 25, 1, 3),
-        Cont("sec-01", 1, 25, 3, 13, [
+        Cont("sec-01", 1, 25, 3, 12, [
             L("rotb-s01", 1, 25, 1, 2),
-            Cont("card-year", 1, 6, 2, 8, [L("plugin-pace-year", 1, 25, 1, 2)], 2),
-            Cont("card-q4", 6, 11, 2, 8, [L("plugin-pace-q4", 1, 25, 1, 2)], 2),
-            Cont("card-week", 11, 16, 2, 8, [L("rk-week", 1, 25, 1, 2)], 2),
-            Cont("card-ccq", 16, 21, 2, 8, [L("rk-ccq", 1, 25, 1, 2)], 2),
-            Cont("card-cwq", 21, 25, 2, 8, [L("rk-cwq", 1, 25, 1, 2)], 2),
-            L("rotb-progress", 1, 25, 8, 9),
+            # Plugins need tall inner grid tracks; text cards use short 1/2.
+            Cont("card-year", 1, 6, 2, 9, [L("plugin-pace-year", 1, 25, 1, 8)], 2),
+            Cont("card-q4", 6, 11, 2, 9, [L("plugin-pace-q4", 1, 25, 1, 8)], 2),
+            Cont("card-week", 11, 16, 2, 9, [L("rk-week", 1, 25, 1, 2)], 2),
+            Cont("card-ccq", 16, 21, 2, 9, [L("rk-ccq", 1, 25, 1, 2)], 2),
+            Cont("card-cwq", 21, 25, 2, 9, [L("rk-cwq", 1, 25, 1, 2)], 2),
         ]),
+        E("rotb-progress", 1, 25, 12, 13),
         Cont("sec-02", 1, 25, 13, 18, [
             L("rotb-s02", 1, 25, 1, 2),
             Cont("cov-1", 1, 7, 2, 6, [L("rk-open", 1, 25, 1, 2)], 2),
