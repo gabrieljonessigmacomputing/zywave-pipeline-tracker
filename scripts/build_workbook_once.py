@@ -240,7 +240,7 @@ def build():
         T("rotb-title", f'# ROTB Summary\n<p class="p-small"><span style="color:{MUTED}">One-page view of creation, coverage, movement, and demand. Q4 · FY2026</span></p>'),
         T("rotb-badge", f'<p style="text-align:right"><span style="color:{MUTED}">Read-only snapshot · October · Snowflake SoT</span></p>'),
         C("sec-01", SECTION, SECTION), C("sec-02", SECTION, SECTION), C("sec-03", SECTION, SECTION),
-        C("sec-04", SECTION, SECTION), C("sec-05", SECTION, SECTION),
+        C("sec-04", SECTION, SECTION),
         C("card-year"), C("card-q4"), C("card-week"), C("card-ccq", AMBER_BG, "#fbbf24"), C("card-cwq", TEAL_BG, "#5eead4"),
         T("rotb-s01", f'## <span style="color:{TEAL}">01 / PIPELINE CREATION</span>\nCreation pace'),
         pace_plugin("plugin-pace-year", "Year Pipeline Created", PACK_YTD, PACK_YG, PACK_YEL),
@@ -280,7 +280,7 @@ def build():
         T("rotb-s04", f'## <span style="color:{BLUE}">04 / EARLY STAGE PIPELINE</span>\nOpen Stage 0–2 · live from VW_PIPELINE'),
         C("dm-mo"),
         # Single tall plugin (early+src stacked) — multiple TV plugin instances stall on ROTB.
-        open_kpi_plugin("plugin-early", "rotb"),
+        open_kpi_plugin("plugin-rotb-tv", "rotb"),
         T("dm-mo-b",
           label("STAGE 2 CREATED THIS MONTH") + "\n" +
           hero(ref(P, "MONTH_ACV", "$,.2s"), ORANGE, 28) + "\n" +
@@ -362,18 +362,18 @@ def build():
           label("PIPELINE TO CLOSE 2 QUARTERS OUT") + "\n" +
           hero(ref(P, "Q2OUT_ACV", "$,.2s")) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">Q2 2027 · {ref(P,"Q2OUT_OPPS",",.0f")} open deals</span></p>'),
-        # DEBUG: only ONE tv plugin in workbook (on ROTB as plugin-early). Re-add Total after.
+        tv_plugin("plugin-tv"),
         T("total-defs",
           f'<p class="p-small"><span style="color:{MUTED}">Up-Market = Mid-Market + Enterprise · '
-          f'Insurance Intelligence = Analytics + Client + Content · RQC &amp; AMS = RQC + Service</span></p>\n'
-          f'<p class="p-small"><span style="color:{MUTED}">Target vs Actual charts temporarily on ROTB (plugin-early) while validating data path.</span></p>'),
+          f'Insurance Intelligence = Analytics + Client + Content · RQC &amp; AMS = RQC + Service</span></p>'),
     ]
 
     # ═══════════════ SOURCING ═══════════════
     els += [
         T("sourcing-title", f'# Pipeline Sourcing\n<p class="p-small"><span style="color:{MUTED}">Marketing vs Sales by deal type · Stage 2+</span></p>'),
+        open_kpi_plugin("plugin-mix", "mix"),
         T("sk-note",
-          f'<p class="p-small"><span style="color:{MUTED}">Open Stage 2+ mix lives on ROTB · same chart-tv KPI grain · Q4 FY2026</span></p>'),
+          f'<p class="p-small"><span style="color:{MUTED}">Open Stage 2+ · same chart-tv KPI grain as ROTB · Q4 FY2026</span></p>'),
     ]
 
     # ═══════════════ MOVEMENT ═══════════════
@@ -478,7 +478,8 @@ def build():
         T("data-note", """# Fast path
 
 7 SQL grains · open VW scanned once (chart-tv = charts + KPI grain); closed Q4 separate.
-Pace / funnel / TV / open-KPI plugins subscribe to pass-through tables (no SumIf re-inline).
+Pace / funnel / TV plugins subscribe to pass-through tables (no SumIf re-inline).
+ROTB open KPIs use TV plugin title=rotb (early+src tiles). First VW load can take 2–3 min.
 """),
     ]
 
@@ -515,10 +516,9 @@ Pace / funnel / TV / open-KPI plugins subscribe to pass-through tables (no SumIf
             L("rotb-s04", 1, 19, 1, 2),
             Cont("dm-mo", 19, 25, 1, 3, [L("dm-mo-b", 1, 25, 1, 8)], 2),
         ]),
-        # Tall direct placement (same pattern as Total plugin-tv)
-        E("plugin-early", 1, 25, 25, 42),
-        E("rotb-s05", 1, 25, 42, 43),
-        E("wb-tv", 1, 2, 43, 44),
+        # Tall plugin: early + sourcing KPI tiles (title=rotb). Needs ~2–3m first load for VW.
+        E("plugin-rotb-tv", 1, 25, 25, 34),
+        E("rotb-s05", 1, 25, 34, 35),
     ]
     open_l = [
         E("open-title", 1, 18, 1, 3), E("open-live", 18, 25, 1, 3),
@@ -546,11 +546,13 @@ Pace / funnel / TV / open-KPI plugins subscribe to pass-through tables (no SumIf
         Cont("tc-1", 1, 9, 3, 8, [L("tk-cq", 1, 25, 1, 8)]),
         Cont("tc-2", 9, 17, 3, 8, [L("tk-nq", 1, 25, 1, 8)]),
         Cont("tc-3", 17, 25, 3, 8, [L("tk-2q", 1, 25, 1, 8)]),
-        E("total-defs", 1, 25, 8, 12),
+        E("plugin-tv", 1, 25, 8, 26),
+        E("total-defs", 1, 25, 26, 28),
     ]
     sourcing_l = [
         E("sourcing-title", 1, 18, 1, 3), E("ctrl-period", 18, 25, 1, 3),
-        E("sk-note", 1, 25, 3, 6),
+        E("plugin-mix", 1, 25, 3, 12),
+        E("sk-note", 1, 25, 12, 14),
     ]
     movement_l = [
         E("movement-title", 1, 25, 1, 3),
@@ -588,7 +590,7 @@ Pace / funnel / TV / open-KPI plugins subscribe to pass-through tables (no SumIf
     ]
     data_l = [E("data-note", 1, 25, 1, 6)]
     row = 6
-    for wid in ["wb-pack", "wb-walkin", "wb-closed", "wb-funnel"]:
+    for wid in ["wb-pack", "wb-walkin", "wb-closed", "wb-funnel", "wb-tv"]:
         data_l.append(E(wid, 1, 25, row, row + 3))
         row += 3
 
