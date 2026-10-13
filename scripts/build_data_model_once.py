@@ -108,8 +108,20 @@ closed AS (
   WHERE METRIC_NAME = 'Forecasted Net ACV'
     AND STAGE_GROUP IN ('Won', 'Lost')
     AND CLOSE_DATE >= '2026-10-01' AND CLOSE_DATE < '2027-01-01'
+),
+early AS (
+  SELECT
+    COUNT(DISTINCT IFF(LEFT(STAGE,1)='0' AND METRIC_VALUE BETWEEN 0 AND 5000000, OPPORTUNITY_ID, NULL)) AS S0_OPPS,
+    COALESCE(SUM(IFF(LEFT(STAGE,1)='0' AND METRIC_VALUE BETWEEN 0 AND 5000000, METRIC_VALUE, 0)),0) AS S0_ACV,
+    COUNT(DISTINCT IFF(LEFT(STAGE,1)='1' AND METRIC_VALUE BETWEEN 0 AND 5000000, OPPORTUNITY_ID, NULL)) AS S1_OPPS,
+    COALESCE(SUM(IFF(LEFT(STAGE,1)='1' AND METRIC_VALUE BETWEEN 0 AND 5000000, METRIC_VALUE, 0)),0) AS S1_ACV,
+    COUNT(DISTINCT IFF(LEFT(STAGE,1)='2' AND METRIC_VALUE BETWEEN 0 AND 5000000, OPPORTUNITY_ID, NULL)) AS S2_OPPS,
+    COALESCE(SUM(IFF(LEFT(STAGE,1)='2' AND METRIC_VALUE BETWEEN 0 AND 5000000, METRIC_VALUE, 0)),0) AS S2_ACV
+  FROM BI_STAGING.DATA.OPPORTUNITY_ACV_METRICS
+  WHERE METRIC_NAME = 'Forecasted Net ACV'
+    AND LEFT(STAGE,1) IN ('0','1','2')
 )
-SELECT o.*, c.*, z.*,
+SELECT o.*, c.*, z.*, e.*,
   {YEAR_GOAL}::FLOAT AS YEAR_GOAL, {Q4_GOAL}::FLOAT AS Q4_GOAL,
   LEAST(1, DATEDIFF(day,'2026-01-01',CURRENT_DATE())/365.0) AS YEAR_ELAPSED,
   LEAST(1, GREATEST(0, DATEDIFF(day,'2026-10-01',CURRENT_DATE())/92.0)) AS Q4_ELAPSED,
@@ -118,7 +130,7 @@ SELECT o.*, c.*, z.*,
   IFF(o.TOTAL_ACV>0, o.CLOSE_CY_ACV/o.TOTAL_ACV, 0) AS CLOSE_CY_PCT,
   IFF(o.TOTAL_ACV>0, o.CLOSE_NY_ACV/o.TOTAL_ACV, 0) AS CLOSE_NY_PCT,
   IFF(o.TOTAL_ACV>0, o.CLOSE_FY_ACV/o.TOTAL_ACV, 0) AS CLOSE_FY_PCT
-FROM open_acv o CROSS JOIN created c CROSS JOIN closed z
+FROM open_acv o CROSS JOIN created c CROSS JOIN closed z CROSS JOIN early e
 """
 
     # 2) Walk-in — tiny snapshot (date-partitioned)
@@ -207,21 +219,7 @@ WHERE METRIC_NAME='Forecasted Net ACV' AND STAGE_2_ATTAINED
 GROUP BY 1
 """
 
-    # 6a) Early-stage KPIs — ACV metrics ONLY (never wait on VW_PIPELINE).
-    open_kpi = """
-SELECT
-  COUNT(DISTINCT IFF(LEFT(STAGE,1)='0' AND METRIC_VALUE BETWEEN 0 AND 5000000, OPPORTUNITY_ID, NULL)) AS S0_OPPS,
-  COALESCE(SUM(IFF(LEFT(STAGE,1)='0' AND METRIC_VALUE BETWEEN 0 AND 5000000, METRIC_VALUE, 0)),0) AS S0_ACV,
-  COUNT(DISTINCT IFF(LEFT(STAGE,1)='1' AND METRIC_VALUE BETWEEN 0 AND 5000000, OPPORTUNITY_ID, NULL)) AS S1_OPPS,
-  COALESCE(SUM(IFF(LEFT(STAGE,1)='1' AND METRIC_VALUE BETWEEN 0 AND 5000000, METRIC_VALUE, 0)),0) AS S1_ACV,
-  COUNT(DISTINCT IFF(LEFT(STAGE,1)='2' AND METRIC_VALUE BETWEEN 0 AND 5000000, OPPORTUNITY_ID, NULL)) AS S2_OPPS,
-  COALESCE(SUM(IFF(LEFT(STAGE,1)='2' AND METRIC_VALUE BETWEEN 0 AND 5000000, METRIC_VALUE, 0)),0) AS S2_ACV
-FROM BI_STAGING.DATA.OPPORTUNITY_ACV_METRICS
-WHERE METRIC_NAME = 'Forecasted Net ACV'
-  AND LEFT(STAGE,1) IN ('0','1','2')
-"""
-
-    # 6b) TV charts — ACV product ONLY (no VW). SEG Actual injected client-side from kpi-src.
+    # 6) TV charts — ACV product ONLY (no VW).
     charts = """
 WITH prod_act AS (
   SELECT
@@ -263,24 +261,12 @@ SELECT 'PROD', a.DIM, 'Actual', a.ACTUAL, NULL FROM prod_act a
         ("WEEK_ACV", m()), ("WEEK_OPPS", None),
         ("CREATED_CLOSING_ACV", m()), ("CREATED_CLOSING_OPPS", None),
         ("WON_ACV", m()), ("WON_OPPS", None), ("LOST_ACV", m()), ("LOST_OPPS", None),
+        ("S0_OPPS", None), ("S0_ACV", m()), ("S1_OPPS", None), ("S1_ACV", m()),
+        ("S2_OPPS", None), ("S2_ACV", m()),
         ("YEAR_GOAL", m()), ("Q4_GOAL", m()),
         ("YEAR_ELAPSED", p()), ("Q4_ELAPSED", p()),
         ("YEAR_PCT_GOAL", p()), ("Q4_PCT_GOAL", p()),
         ("CLOSE_CY_PCT", p()), ("CLOSE_NY_PCT", p()), ("CLOSE_FY_PCT", p()),
-    ]
-    # Daily open ACV trend — date-filtered snapshot (Movement page only)
-    snap = """
-SELECT SNAPSHOTDATE AS DT, COALESCE(SUM(FCST_NETACV),0) AS ACV
-FROM BI_STAGING.SNAPSHOT.VW_PIPELINE
-WHERE SNAPSHOTDATE >= DATEADD(day, -14, CURRENT_DATE())
-  AND LEFT(STAGE_NAME,1) IN ('2','3','4','5','6','7')
-  AND FCST_NETACV BETWEEN 0 AND 5000000
-GROUP BY 1
-"""
-
-    open_kpi_cols = [
-        ("S0_OPPS", None), ("S0_ACV", m()), ("S1_OPPS", None), ("S1_ACV", m()),
-        ("S2_OPPS", None), ("S2_ACV", m()),
     ]
     src_kpi_cols = [
         ("MKT_ACV", m()), ("SALES_ACV", m()), ("SRC_TOTAL_ACV", m()),
@@ -291,8 +277,7 @@ GROUP BY 1
     return [
         sql_table("kpi-pack", "KPI Pack", pack, pack_cols),
         sql_table("kpi-walkin", "KPI Walkin", walkin, [("WALKIN_OPPS", None), ("WALKIN_ACV", m())]),
-        sql_table("kpi-open", "KPI Open", open_kpi, open_kpi_cols),
-        # Open-VW only for Sourcing (not ROTB/Open/Total/Created/Movement KPIs)
+        # Open-VW only for Sourcing (not ROTB/Open/Total/Created/Movement)
         sql_table("kpi-src", "KPI Sourcing", src_kpi, src_kpi_cols),
         sql_table("chart-tv", "Chart Target Actual Source", charts, [
             ("GRAIN", None), ("DIM", None), ("SERIES", None), ("VAL", m()), ("OPPS", None)]),
@@ -300,8 +285,6 @@ GROUP BY 1
             ("STAGE", None), ("ORD", None), ("ACV", m())]),
         sql_table("chart-created", "Chart Created", created_month, [
             ("MONTH", {"kind": "datetime", "formatString": "%b %Y"}), ("ACV", m())]),
-        sql_table("chart-snap", "Chart Snapshot Trend", snap, [
-            ("DT", {"kind": "datetime", "formatString": "%b %d"}), ("ACV", m())]),
     ]
 
 

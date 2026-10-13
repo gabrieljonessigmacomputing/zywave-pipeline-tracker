@@ -116,6 +116,8 @@ def build():
         ("WEEK_ACV", m()), ("WEEK_OPPS", None),
         ("CREATED_CLOSING_ACV", m()), ("CREATED_CLOSING_OPPS", None),
         ("WON_ACV", m()), ("WON_OPPS", None), ("LOST_ACV", m()), ("LOST_OPPS", None),
+        ("S0_OPPS", None), ("S0_ACV", m()), ("S1_OPPS", None), ("S1_ACV", m()),
+        ("S2_OPPS", None), ("S2_ACV", m()),
         ("YEAR_GOAL", m()), ("Q4_GOAL", m()),
         ("YEAR_ELAPSED", p()), ("Q4_ELAPSED", p()),
         ("YEAR_PCT_GOAL", p()), ("Q4_PCT_GOAL", p()),
@@ -125,11 +127,6 @@ def build():
         pass_tbl("wb-pack", "WB Pack", "kpi-pack", "KPI Pack", pack_cols),
         pass_tbl("wb-walkin", "WB Walkin", "kpi-walkin", "KPI Walkin",
                  [("WALKIN_OPPS", None), ("WALKIN_ACV", m())]),
-        # Early stages (ACV) — never waits on VW.
-        pass_tbl("wb-open", "WB Open", "kpi-open", "KPI Open", [
-            ("S0_OPPS", None), ("S0_ACV", m()), ("S1_OPPS", None), ("S1_ACV", m()),
-            ("S2_OPPS", None), ("S2_ACV", m()),
-        ]),
         # Open-VW sourcing — Sourcing only (NOT on ROTB/Open/Total/Created/Movement).
         pass_tbl("wb-src", "WB Sourcing", "kpi-src", "KPI Sourcing", [
             ("MKT_ACV", m()), ("SALES_ACV", m()), ("SRC_TOTAL_ACV", m()),
@@ -146,13 +143,13 @@ def build():
 
     # Column ids on wb-pack (must match pack_cols order above)
     PACK_YTD, PACK_Q4C = "wb-pack-12", "wb-pack-13"
-    PACK_YG, PACK_Q4G = "wb-pack-25", "wb-pack-26"
-    PACK_YEL, PACK_Q4EL = "wb-pack-27", "wb-pack-28"
+    PACK_YG, PACK_Q4G = "wb-pack-31", "wb-pack-32"
+    PACK_YEL, PACK_Q4EL = "wb-pack-33", "wb-pack-34"
 
     plug = load_plugin_ids()
     PACE_ID, FUNNEL_ID, TV_ID = plug["pace"], plug["funnel"], plug["tv"]
     P, W = "WB Pack", "WB Walkin"
-    O, S = "WB Open", "WB Sourcing"
+    S = "WB Sourcing"
 
     def ref(table, col, fmt):
         return "{{" + f"[{table}/{col}] | {fmt}" + "}}"
@@ -209,6 +206,7 @@ def build():
 
     # Controls
     els += [
+        # Chrome-only controls (still match). Not wired into SQL grains — keep decorative.
         {"kind": "control", "id": "ctrl-segment", "controlId": "Segment", "name": "All Segments",
          "controlType": "list", "mode": "include", "selectionMode": "single",
          "source": {"kind": "manual", "valueType": "text",
@@ -222,10 +220,10 @@ def build():
         {"kind": "control", "id": "ctrl-stage1", "controlId": "IncludeStage1",
          "name": "Include Stage 1 (Unique Meeting Run)", "controlType": "checkbox",
          "mode": "True/False", "value": False},
-        {"kind": "control", "id": "ctrl-period", "controlId": "SourcingPeriod", "name": "Period",
+        {"kind": "control", "id": "ctrl-period", "controlId": "SourcingPeriod", "name": "Close window",
          "controlType": "list", "mode": "include", "selectionMode": "single",
-         "source": {"kind": "manual", "valueType": "text", "values": ["Q4", "YTD"],
-                    "labels": ["Current Quarter (Q4)", "Year-to-Date"]}, "value": "Q4"},
+         "source": {"kind": "manual", "valueType": "text", "values": ["Q4Q2"],
+                    "labels": ["Q4–Q2-out (fixed · open-VW)"]}, "value": "Q4Q2"},
     ]
 
     # ═══════════════ ROTB (still chrome: section shells + pace strips) ═══════════════
@@ -266,16 +264,16 @@ def build():
         C("dm-s0"), C("dm-s1"), C("dm-s2", TEAL_BG, "#5eead4"), C("dm-mo"),
         T("dm-s0-b",
           label("STAGE 0 OPEN") + "\n" +
-          hero(ref(O, "S0_ACV", "$,.2s"), BLUE, 28) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">{ref(O,"S0_OPPS",",.0f")} opportunities</span></p>'),
+          hero(ref(P, "S0_ACV", "$,.2s"), BLUE, 28) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"S0_OPPS",",.0f")} opportunities</span></p>'),
         T("dm-s1-b",
           label("STAGE 1 OPEN") + "\n" +
-          hero(ref(O, "S1_ACV", "$,.2s"), BLUE, 28) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">{ref(O,"S1_OPPS",",.0f")} opportunities</span></p>'),
+          hero(ref(P, "S1_ACV", "$,.2s"), BLUE, 28) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"S1_OPPS",",.0f")} opportunities</span></p>'),
         T("dm-s2-b",
           label("STAGE 2 OPEN") + "\n" +
-          hero(ref(O, "S2_ACV", "$,.2s"), TEAL, 28) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">{ref(O,"S2_OPPS",",.0f")} opportunities</span></p>'),
+          hero(ref(P, "S2_ACV", "$,.2s"), TEAL, 28) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"S2_OPPS",",.0f")} opportunities</span></p>'),
         T("dm-mo-b",
           label("STAGE 2 CREATED THIS MONTH") + "\n" +
           hero(ref(P, "MONTH_ACV", "$,.2s"), ORANGE, 28) + "\n" +
@@ -319,8 +317,8 @@ def build():
           f'<p class="p-small"><span style="color:{MUTED}">Frozen · {ref(W,"WALKIN_OPPS",",.0f")} opps</span></p>'),
         T("mv-early",
           f'<p class="p-small"><span style="color:{RED}">Early stage open (S0)</span></p>\n'
-          + hero(ref(O, "S0_ACV", "$,.2s"), RED, 22) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">S0 {ref(O,"S0_OPPS",",.0f")} · S1 {ref(O,"S1_OPPS",",.0f")} opps</span></p>'),
+          + hero(ref(P, "S0_ACV", "$,.2s"), RED, 22) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">S0 {ref(P,"S0_OPPS",",.0f")} · S1 {ref(P,"S1_OPPS",",.0f")} opps</span></p>'),
         T("mv-add", f'<p class="p-small"><span style="color:{MUTED}">WHAT ADDED</span></p>'),
         C("mv-cr-c", GREEN_BG, "#bbf7d0"), C("mv-ccq-c", AMBER_BG, "#fbbf24"),
         T("mv-cr",
@@ -436,20 +434,6 @@ def build():
         T("mb-wn", label("− WON") + "\n" + hero(ref(P, "WON_ACV", "$,.2s"), GREEN, 26)),
         T("mb-ls", label("− LOST ≤$50k") + "\n" + hero(ref(P, "LOST_ACV", "$,.2s"), RED, 26)),
         T("mb-q4", label("= Q4 OPEN") + "\n" + hero(ref(P, "Q4_ACV", "$,.2s"), BLUE, 26)),
-        # Optional slow trend — Data page only (chart-snap).
-        {
-            "id": "chart-snap", "kind": "line-chart", "name": "Open Pipeline Snapshot Trend",
-            "source": dm("chart-snap"),
-            "columns": [
-                {"id": "sn-d", "name": "Date", "formula": "[Chart Snapshot Trend/DT]",
-                 "format": {"kind": "datetime", "formatString": "%b %d"}},
-                {"id": "sn-v", "name": "ACV", "formula": "[Chart Snapshot Trend/ACV]",
-                 "format": {"kind": "number", "formatString": "$,.2s"}},
-            ],
-            "xAxis": {"columnId": "sn-d"}, "yAxis": {"columnIds": ["sn-v"]},
-            "color": {"by": "single", "value": BLUE},
-            "style": {"backgroundColor": WHITE, "borderRadius": "round", "borderColor": BORDER, "borderWidth": 1},
-        },
     ]
 
     # ═══════════════ CREATED ═══════════════
@@ -513,9 +497,9 @@ def build():
         },
         T("data-note", """# Fast path
 
-Hot pages (ROTB / Open / Total / Created / Movement) = ACV pack + walk-in + funnel/TV.
-Sourcing only hits open presentation VW (Lead Source + SplitSegment tokens).
-Optional 14-day snapshot trend lives on this Data page only.
+Hot pages = one ACV pack row (open/created/won/lost/early) + walk-in + funnel/TV charts.
+Sourcing only = open presentation VW (Lead Source + SplitSegment tokens).
+No daily snapshot grain — Movement uses pack bridge.
 """),
     ]
 
@@ -596,6 +580,8 @@ Optional 14-day snapshot trend lives on this Data page only.
             Cont("sc-unmap", 19, 25, 1, 10, [L("sk-unmap", 1, 25, 1, 9)], 2),
         ]),
         E("sk-note", 1, 25, 24, 26),
+        # Keep open-VW table on Sourcing only (not Data) so other pages never bind it.
+        E("wb-src", 1, 25, 26, 28),
     ]
     movement_l = [
         E("movement-title", 1, 25, 1, 3),
@@ -633,17 +619,9 @@ Optional 14-day snapshot trend lives on this Data page only.
     ]
     data_l = [E("data-note", 1, 25, 1, 6)]
     row = 6
-    for wid in ["wb-pack", "wb-walkin", "wb-open", "wb-src", "wb-funnel", "wb-tv"]:
+    for wid in ["wb-pack", "wb-walkin", "wb-funnel", "wb-tv"]:
         data_l.append(E(wid, 1, 25, row, row + 3))
         row += 3
-    data_l += [
-        E("mv-trend-h", 1, 25, row, row + 2),
-        E("chart-snap", 1, 25, row + 2, row + 14),
-    ]
-    # keep heading element for data page snap
-    els += [
-        T("mv-trend-h", f'## Daily open pipeline (optional)\n<span style="color:{MUTED}">Last 14 days · snapshot VW · kept off Movement for speed</span>'),
-    ]
 
     layout = "\n".join([
         '<?xml version="1.0" encoding="utf-8"?>',
