@@ -414,7 +414,7 @@ SELECT 'PROD', a.DIM, 'Actual', a.ACTUAL, NULL FROM prod_act a
         sql_table("chart-funnel", "Chart Funnel", funnel, [
             ("STAGE", None), ("ORD", None), ("ACV", m()), ("OPPS", None)]),
         sql_table("chart-created", "Chart Created", created_month, [
-            ("QUARTER", None), ("ORD", None), ("FY2025", m()), ("FY2026", m())]),
+            ("ORD", None), ("QUARTER", None), ("FY2025", m()), ("FY2026", m())]),
         sql_table("chart-closemo", "Chart Close Month Stage", close_mo, [
             ("MONTH", {"kind": "datetime", "formatString": "%b %Y"}),
             ("STAGE", None), ("ORD", None), ("ACV", m()), ("OPPS", None)]),
