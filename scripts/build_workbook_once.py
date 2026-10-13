@@ -402,9 +402,9 @@ def build():
           hero(ref(S, "SEG_UNMAPPED", "$,.2s"), MUTED, 28) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">No Core/Mid/Enterprise token in Segment</span></p>'),
         T("sk-note",
-          f'<p class="p-small"><span style="color:{MUTED}">Open-VW 1-row · Lead Source + SplitSegment market tokens · '
-          f'VW open {ref(S,"OPEN_ALL_ACV","$,.2s")} (pack {ref(P,"TOTAL_ACV","$,.2s")}) · '
-          f'kept off ROTB/Open/Total/Created · Q4 FY2026</span></p>'),
+          f'<p class="p-small"><span style="color:{MUTED}">Open-VW 1-row · Lead Source + SplitSegment tokens · '
+          f'close Q4–Q2-out · VW {ref(S,"OPEN_ALL_ACV","$,.2s")} (pack {ref(P,"TOTAL_ACV","$,.2s")}) · '
+          f'only slow page · Q4 FY2026</span></p>'),
     ]
 
     # ═══════════════ MOVEMENT ═══════════════
