@@ -55,7 +55,11 @@
     if (cfgVal == null || cfgVal === "") return null;
     if (typeof cfgVal === "string" || typeof cfgVal === "number") return String(cfgVal);
     if (Object.prototype.toString.call(cfgVal) === "[object Array]") return colKey(cfgVal[0]);
-    if (typeof cfgVal === "object") return String(cfgVal.columnId || cfgVal.id || "");
+    if (typeof cfgVal === "object") {
+      if (cfgVal.columnId != null) return String(cfgVal.columnId);
+      if (cfgVal.id != null) return String(cfgVal.id);
+      if (cfgVal.name != null) return String(cfgVal.name);
+    }
     return null;
   }
   function sourceId(src) {
@@ -70,16 +74,26 @@
       || (window.sigmaComputing && window.sigmaComputing.plugin && window.sigmaComputing.plugin.client)
       || null;
   }
+  function pickCol(data, key, fallbacks) {
+    if (!data) return null;
+    if (key && data[key] && data[key].length) return data[key];
+    var names = fallbacks || [];
+    for (var i = 0; i < names.length; i++) {
+      if (data[names[i]] && data[names[i]].length) return data[names[i]];
+    }
+    return null;
+  }
 
   function parseKpi(rows) {
     var o = { MKT: 0, SALES: 0, S0: 0, S0o: 0, S1: 0, S1o: 0, S2: 0, S2o: 0 };
     rows.forEach(function (r) {
-      if (r.grain !== "KPI") return;
-      if (r.dim === "MKT") o.MKT = r.val;
-      else if (r.dim === "SALES") o.SALES = r.val;
-      else if (r.dim === "S0") { o.S0 = r.val; o.S0o = r.opps || 0; }
-      else if (r.dim === "S1") { o.S1 = r.val; o.S1o = r.opps || 0; }
-      else if (r.dim === "S2") { o.S2 = r.val; o.S2o = r.opps || 0; }
+      if (String(r.grain).toUpperCase() !== "KPI") return;
+      var dim = String(r.dim || "").toUpperCase();
+      if (dim === "MKT" || dim === "MARKETING") o.MKT = r.val;
+      else if (dim === "SALES") o.SALES = r.val;
+      else if (dim === "S0") { o.S0 = r.val; o.S0o = r.opps || 0; }
+      else if (dim === "S1") { o.S1 = r.val; o.S1o = r.opps || 0; }
+      else if (dim === "S2") { o.S2 = r.val; o.S2o = r.opps || 0; }
     });
     var tot = o.MKT + o.SALES || 1;
     o.mMix = o.MKT / tot; o.sMix = o.SALES / tot;
@@ -125,12 +139,31 @@
     root.innerHTML = h;
   }
 
-  function synth() {
-    return { MKT: 1e7, SALES: 2.2e7, S0: 3.1e7, S0o: 1199, S1: 5.4e6, S1o: 86, S2: 1.5e7, S2o: 522,
-             mMix: 0.31, sMix: 0.69 };
-  }
+  var LAST = null, MODE = "mix", CFG = null, unsub = null, sidKey = null;
 
-  var LAST = null, MODE = "mix", unsub = null;
+  function applyData(data) {
+    if (!CFG) return;
+    var gk = colKey(CFG.grain), dk = colKey(CFG.dim), sk = colKey(CFG.series), vk = colKey(CFG.val);
+    var ok = colKey(CFG.opps);
+    var g = pickCol(data, gk, ["GRAIN", "Grain", "wb-tv-0"]);
+    var d = pickCol(data, dk, ["DIM", "Dim", "wb-tv-1"]);
+    var s = pickCol(data, sk, ["SERIES", "Series", "wb-tv-2"]);
+    var v = pickCol(data, vk, ["VAL", "Val", "Value", "wb-tv-3"]);
+    var o = pickCol(data, ok, ["OPPS", "Opps", "wb-tv-4"]);
+    if (!g || !d || !v || !g.length) return;
+    var rows = [];
+    for (var i = 0; i < g.length; i++) {
+      rows.push({
+        grain: String(g[i] == null ? "" : g[i]),
+        dim: String(d[i] == null ? "" : d[i]),
+        series: String(s && s[i] != null ? s[i] : ""),
+        val: Number(v[i]) || 0,
+        opps: o && o[i] != null ? Number(o[i]) : 0,
+      });
+    }
+    LAST = parseKpi(rows);
+    render(MODE, LAST);
+  }
 
   function wire(client) {
     client.config.configureEditorPanel([
@@ -140,30 +173,28 @@
       { name: "series", type: "column", source: "source", allowedTypes: ["text"], label: "Series" },
       { name: "val", type: "column", source: "source", allowedTypes: ["number"], label: "Value" },
       { name: "opps", type: "column", source: "source", allowedTypes: ["number"], label: "Opps" },
-      { name: "mode", type: "dropdown", values: ["early", "src", "mix", "left"], label: "Layout", defaultValue: "mix" }
+      { name: "mode", type: "text", label: "Layout (early|src|mix|left)", defaultValue: "mix" }
     ]);
     client.config.subscribe(function (cfg) {
-      if (unsub) { unsub(); unsub = null; }
+      CFG = cfg || null;
       MODE = (cfg && cfg.mode) || "mix";
-      if (!cfg || !sourceId(cfg.source) || !colKey(cfg.grain)) {
-        LAST = synth(); render(MODE, LAST); return;
+      if (typeof MODE === "object") MODE = MODE.value || MODE.id || "mix";
+      MODE = String(MODE || "mix").toLowerCase();
+      var sid = CFG && sourceId(CFG.source);
+      if (!sid || !colKey(CFG.grain)) {
+        if (!LAST) render(MODE, null);
+        return;
       }
+      if (sidKey === sid && unsub) {
+        // same source — keep subscription; mode-only change just re-renders
+        if (LAST) render(MODE, LAST);
+        return;
+      }
+      if (unsub) { unsub(); unsub = null; }
+      sidKey = sid;
       render(MODE, null);
-      unsub = client.elements.subscribeToElementData(cfg.source, function (data) {
-        var gk = colKey(cfg.grain), dk = colKey(cfg.dim), sk = colKey(cfg.series), vk = colKey(cfg.val);
-        var ok = colKey(cfg.opps);
-        var g = data && data[gk], d = data && data[dk], s = data && data[sk], v = data && data[vk];
-        var o = ok && data ? data[ok] : null;
-        if (!g || !d || !v || !g.length) { render(MODE, null); return; }
-        var rows = [];
-        for (var i = 0; i < g.length; i++) {
-          rows.push({
-            grain: String(g[i] || ""), dim: String(d[i] || ""),
-            series: String(s && s[i] || ""), val: Number(v[i]) || 0,
-            opps: o && o[i] != null ? Number(o[i]) : 0,
-          });
-        }
-        LAST = parseKpi(rows); render(MODE, LAST);
+      unsub = client.elements.subscribeToElementData(CFG.source, function (data) {
+        applyData(data);
       });
     });
   }
@@ -173,7 +204,7 @@
     var client = getClient();
     if (client) { wire(client); return; }
     if (++tries < 40) { setTimeout(boot, 50); return; }
-    LAST = synth(); render("mix", LAST);
+    render("mix", null);
   })();
   if (window.ResizeObserver) new ResizeObserver(function () { if (LAST) render(MODE, LAST); }).observe(root);
 })();

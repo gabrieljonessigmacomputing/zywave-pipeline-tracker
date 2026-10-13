@@ -521,6 +521,8 @@ Pace / funnel / TV / open-KPI plugins subscribe to pass-through tables (no SumIf
             L("rotb-s05", 1, 25, 1, 2),
             Cont("sg-src", 1, 25, 2, 6, [L("plugin-src", 1, 25, 1, 8)], 2),
         ]),
+        # Keep wb-tv on ROTB so chart-tv runs when this page loads (plugins alone can stall).
+        E("wb-tv", 1, 2, 33, 34),
     ]
     open_l = [
         E("open-title", 1, 18, 1, 3), E("open-live", 18, 25, 1, 3),
@@ -592,7 +594,7 @@ Pace / funnel / TV / open-KPI plugins subscribe to pass-through tables (no SumIf
     ]
     data_l = [E("data-note", 1, 25, 1, 6)]
     row = 6
-    for wid in ["wb-pack", "wb-walkin", "wb-closed", "wb-funnel", "wb-tv"]:
+    for wid in ["wb-pack", "wb-walkin", "wb-closed", "wb-funnel"]:
         data_l.append(E(wid, 1, 25, row, row + 3))
         row += 3
 

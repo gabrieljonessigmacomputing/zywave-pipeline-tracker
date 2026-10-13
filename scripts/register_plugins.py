@@ -35,7 +35,7 @@ PLUGINS = [
         "key": "openKpis",
         "name": "Pipeline Tracker · Open KPI tiles",
         "description": "Early-stage + sourcing KPI tiles from chart-tv KPI grain (no SumIf re-inline).",
-        "url": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/open-kpis-v2/",
+        "url": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/open-kpis-v3/",
         "devUrl": "http://localhost:5173",
     },
 ]
