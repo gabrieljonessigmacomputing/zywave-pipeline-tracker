@@ -124,21 +124,24 @@ def build():
         pass_tbl("wb-pack", "WB Pack", "kpi-pack", "KPI Pack", pack_cols),
         pass_tbl("wb-walkin", "WB Walkin", "kpi-walkin", "KPI Walkin",
                  [("WALKIN_OPPS", None), ("WALKIN_ACV", m())]),
-        # One workbook passthrough for the single VW grain (closed + sourcing + SEG).
-        pass_tbl("wb-vw", "WB VW", "kpi-vw", "KPI VW", [
+        # Closed Q4 only (date-selective) — safe for ROTB.
+        pass_tbl("wb-closed", "WB Closed", "kpi-closed", "KPI Closed Q4", [
             ("WON_ACV", m()), ("WON_OPPS", None), ("LOST_ACV", m()), ("LOST_OPPS", None),
-            ("MKT_ACV", m()), ("SALES_ACV", m()), ("SRC_TOTAL_ACV", m()),
-            ("MKT_MIX", p()), ("SALES_MIX", p()),
-            ("SEG_CORE", m()), ("SEG_MID", m()), ("SEG_ENT", m()),
         ]),
-        # Early stages (ACV) — text {{[WB Open/…]}}; never waits on VW.
+        # Early stages (ACV) — never waits on VW.
         pass_tbl("wb-open", "WB Open", "kpi-open", "KPI Open", [
             ("S0_OPPS", None), ("S0_ACV", m()), ("S1_OPPS", None), ("S1_ACV", m()),
             ("S2_OPPS", None), ("S2_ACV", m()),
         ]),
+        # Open-VW sourcing — Sourcing + Total pages only (NOT on ROTB).
+        pass_tbl("wb-src", "WB Sourcing", "kpi-src", "KPI Sourcing", [
+            ("MKT_ACV", m()), ("SALES_ACV", m()), ("SRC_TOTAL_ACV", m()),
+            ("MKT_MIX", p()), ("SALES_MIX", p()),
+            ("SEG_CORE", m()), ("SEG_MID", m()), ("SEG_ENT", m()),
+        ]),
         pass_tbl("wb-funnel", "WB Funnel", "chart-funnel", "Chart Funnel",
                  [("STAGE", None), ("ORD", None), ("ACV", m())]),
-        # ACV-only TV grain (fast). SEG Actual merged from wb-vw in the plugin.
+        # ACV-only TV grain (fast). SEG Actual from wb-src in the plugin.
         pass_tbl("wb-tv", "WB TV", "chart-tv", "Chart Target Actual Source",
                  [("GRAIN", None), ("DIM", None), ("SERIES", None), ("VAL", m()), ("OPPS", None)]),
     ]
@@ -151,7 +154,7 @@ def build():
     plug = load_plugin_ids()
     PACE_ID, FUNNEL_ID, TV_ID = plug["pace"], plug["funnel"], plug["tv"]
     P, W = "WB Pack", "WB Walkin"
-    Z, O, S = "WB VW", "WB Open", "WB VW"  # Z=closed cols, S=sourcing cols on same 1-row VW
+    Z, O, S = "WB Closed", "WB Open", "WB Sourcing"
 
     def ref(table, col, fmt):
         return "{{" + f"[{table}/{col}] | {fmt}" + "}}"
@@ -185,8 +188,8 @@ def build():
             "style": {"backgroundColor": WHITE},
         }
 
-    def tv_plugin(eid, src_eid="wb-tv", kpi_eid="wb-vw"):
-        # ACV chart grain (fast) + SEG Actual from wb-vw (same kpi-vw job as ROTB closed/src).
+    def tv_plugin(eid, src_eid="wb-tv", kpi_eid="wb-src"):
+        # ACV chart grain (fast) + SEG Actual from wb-src (open-VW; not loaded on ROTB).
         return {
             "id": eid, "kind": "plugin", "pluginId": TV_ID, "displayName": "Target vs Actual",
             "config": {
@@ -197,11 +200,11 @@ def build():
                 "val": {"kind": "column", "columnId": f"{src_eid}-3", "source": "source"},
                 "opps": {"kind": "column", "columnId": f"{src_eid}-4", "source": "source"},
                 "kpiSource": {"kind": "element", "elementId": kpi_eid},
-                "mkt": {"kind": "column", "columnId": f"{kpi_eid}-4", "source": "kpiSource"},
-                "sales": {"kind": "column", "columnId": f"{kpi_eid}-5", "source": "kpiSource"},
-                "segCore": {"kind": "column", "columnId": f"{kpi_eid}-9", "source": "kpiSource"},
-                "segMid": {"kind": "column", "columnId": f"{kpi_eid}-10", "source": "kpiSource"},
-                "segEnt": {"kind": "column", "columnId": f"{kpi_eid}-11", "source": "kpiSource"},
+                "mkt": {"kind": "column", "columnId": f"{kpi_eid}-0", "source": "kpiSource"},
+                "sales": {"kind": "column", "columnId": f"{kpi_eid}-1", "source": "kpiSource"},
+                "segCore": {"kind": "column", "columnId": f"{kpi_eid}-5", "source": "kpiSource"},
+                "segMid": {"kind": "column", "columnId": f"{kpi_eid}-6", "source": "kpiSource"},
+                "segEnt": {"kind": "column", "columnId": f"{kpi_eid}-7", "source": "kpiSource"},
             },
             "style": {"backgroundColor": WHITE},
         }
@@ -238,7 +241,7 @@ def build():
         T("rotb-title", f'# ROTB Summary\n<p class="p-small"><span style="color:{MUTED}">One-page view of creation, coverage, movement, and demand. Q4 · FY2026</span></p>'),
         T("rotb-badge", f'<p style="text-align:right"><span style="color:{MUTED}">Read-only snapshot · October · Snowflake SoT</span></p>'),
         C("sec-01", SECTION, SECTION), C("sec-02", SECTION, SECTION), C("sec-03", SECTION, SECTION),
-        C("sec-04", SECTION, SECTION), C("sec-05", SECTION, SECTION),
+        C("sec-04", SECTION, SECTION),
         C("card-year"), C("card-q4"), C("card-week"), C("card-ccq", AMBER_BG, "#fbbf24"), C("card-cwq", TEAL_BG, "#5eead4"),
         T("rotb-s01", f'## <span style="color:{TEAL}">01 / PIPELINE CREATION</span>\nCreation pace'),
         pace_plugin("plugin-pace-year", "Year Pipeline Created", PACK_YTD, PACK_YG, PACK_YEL),
@@ -293,18 +296,7 @@ def build():
           label("STAGE 2 CREATED THIS MONTH") + "\n" +
           hero(ref(P, "MONTH_ACV", "$,.2s"), ORANGE, 28) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"MONTH_OPPS",",.0f")} opportunities</span></p>'),
-        T("rotb-s05", f'## <span style="color:{ORANGE}">05 / SALES PIPELINE GENERATION</span>\nOpen Stage 2+ by Lead Source'),
-        C("sg-m"), C("sg-s"),
-        T("rk-mkt",
-          label("MARKETING-SOURCED") + "\n" +
-          hero(ref(S, "MKT_ACV", "$,.2s"), BLUE, 32) + "\n" +
-          f'<p class="p-small"><span style="color:{BLUE}">Actual mix {ref(S,"MKT_MIX",".0%")}</span></p>\n'
-          f'<p class="p-small"><span style="color:{MUTED}">target mix 39%</span></p>'),
-        T("rk-sales",
-          label("SALES-SOURCED") + "\n" +
-          hero(ref(S, "SALES_ACV", "$,.2s"), ORANGE, 32) + "\n" +
-          f'<p class="p-small"><span style="color:{ORANGE}">Actual mix {ref(S,"SALES_MIX",".0%")}</span></p>\n'
-          f'<p class="p-small"><span style="color:{MUTED}">target mix 61%</span></p>'),
+        # Sourcing intentionally omitted from ROTB (open-VW is slow) — see Pipeline Sourcing tab.
         T("rotb-progress",
           f'<p class="p-small"><span style="color:{MUTED}">Year progress {ref(P,"YEAR_ELAPSED",".0%")} · '
           f'Quarter progress {ref(P,"Q4_ELAPSED",".0%")}</span></p>'),
@@ -558,11 +550,6 @@ TV charts = ACV product + lean VW segment (Total page). No open-KPI plugins. No 
             Cont("dm-s2", 13, 19, 2, 6, [L("dm-s2-b", 1, 25, 1, 8)], 2),
             Cont("dm-mo", 19, 25, 2, 6, [L("dm-mo-b", 1, 25, 1, 8)], 2),
         ]),
-        Cont("sec-05", 1, 25, 28, 33, [
-            L("rotb-s05", 1, 25, 1, 2),
-            Cont("sg-m", 1, 13, 2, 6, [L("rk-mkt", 1, 25, 1, 8)], 2),
-            Cont("sg-s", 13, 25, 2, 6, [L("rk-sales", 1, 25, 1, 8)], 2),
-        ]),
     ]
     open_l = [
         E("open-title", 1, 18, 1, 3), E("open-live", 18, 25, 1, 3),
@@ -639,7 +626,7 @@ TV charts = ACV product + lean VW segment (Total page). No open-KPI plugins. No 
     ]
     data_l = [E("data-note", 1, 25, 1, 6)]
     row = 6
-    for wid in ["wb-pack", "wb-walkin", "wb-vw", "wb-open", "wb-funnel", "wb-tv"]:
+    for wid in ["wb-pack", "wb-walkin", "wb-closed", "wb-open", "wb-src", "wb-funnel", "wb-tv"]:
         data_l.append(E(wid, 1, 25, row, row + 3))
         row += 3
 
