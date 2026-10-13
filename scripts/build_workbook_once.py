@@ -783,9 +783,9 @@ def build():
             "columns": [
                 {"id": "ccm-ord", "name": "Ord", "formula": "[Chart Created/ORD]"},
                 {"id": "ccm-q", "name": "Quarter", "formula": "[Chart Created/QUARTER]"},
-                {"id": "ccm-fy25", "name": "FY2025", "formula": "[Chart Created/FY2025]",
+                {"id": "ccm-fy25", "name": "FY2025", "formula": "Sum([Chart Created/FY2025])",
                  "format": {"kind": "number", "formatString": "$,.2s"}},
-                {"id": "ccm-fy26", "name": "FY2026", "formula": "[Chart Created/FY2026]",
+                {"id": "ccm-fy26", "name": "FY2026", "formula": "Sum([Chart Created/FY2026])",
                  "format": {"kind": "number", "formatString": "$,.2s"}},
             ],
             "xAxis": {"columnId": "ccm-q"},
