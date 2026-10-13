@@ -121,16 +121,50 @@ SELECT COUNT(*) AS WALKIN_OPPS, COALESCE(SUM(v),0) AS WALKIN_ACV FROM (
   GROUP BY 1 HAVING MAX(FCST_NETACV) BETWEEN 0 AND 2000000
 )"""
 
-    # 3a) Closed Q4 only — tiny date-filtered slice (was drowning in the mega VW OR)
-    closed = """
+    # 3) ONE VW_PIPELINE scan — closed Q4 + open sourcing + segment (never scan VW twice).
+    vw_kpi = """
+WITH b AS (
+  SELECT
+    "Is Closed" AS IS_CLOSED,
+    "Is Won" AS IS_WON,
+    "Close Date" AS CLOSE_DT,
+    "Lead Source" AS LS,
+    "Segment" AS SEG,
+    LEFT("Stage Name",1) AS STAGE1,
+    ID,
+    NETACV__C AS NET,
+    FCST_NETACV AS FCST
+  FROM BI_PRESENTATION.REPORT.VW_PIPELINE
+  WHERE (
+      ("Is Closed" AND "Close Date" >= '2026-10-01' AND "Close Date" < '2027-01-01')
+      OR (
+        NOT "Is Closed"
+        AND LEFT("Stage Name",1) IN ('2','3','4','5','6','7')
+        AND FCST_NETACV BETWEEN 0 AND 5000000
+      )
+    )
+),
+agg AS (
+  SELECT
+    COALESCE(SUM(IFF(IS_CLOSED AND IS_WON, NET, 0)),0) AS WON_ACV,
+    COUNT(DISTINCT IFF(IS_CLOSED AND IS_WON, ID, NULL)) AS WON_OPPS,
+    COALESCE(SUM(IFF(IS_CLOSED AND NOT IS_WON AND NET BETWEEN 0 AND 50000, NET, 0)),0) AS LOST_ACV,
+    COUNT(DISTINCT IFF(IS_CLOSED AND NOT IS_WON AND NET BETWEEN 0 AND 50000, ID, NULL)) AS LOST_OPPS,
+    COALESCE(SUM(IFF(NOT IS_CLOSED AND LS='Marketing', FCST, 0)),0) AS MKT_ACV,
+    COALESCE(SUM(IFF(NOT IS_CLOSED AND LS='Sales Generated', FCST, 0)),0) AS SALES_ACV,
+    COALESCE(SUM(IFF(NOT IS_CLOSED AND CONTAINS(SEG,'Core'), FCST, 0)),0) AS SEG_CORE,
+    COALESCE(SUM(IFF(NOT IS_CLOSED AND (CONTAINS(SEG,'Mid') OR SEG='MM'), FCST, 0)),0) AS SEG_MID,
+    COALESCE(SUM(IFF(NOT IS_CLOSED AND (CONTAINS(SEG,'Enterprise') OR CONTAINS(SEG,'Up-Market')), FCST, 0)),0) AS SEG_ENT
+  FROM b
+)
 SELECT
-  COALESCE(SUM(IFF("Is Won", NETACV__C, 0)),0) AS WON_ACV,
-  COUNT(DISTINCT IFF("Is Won", ID, NULL)) AS WON_OPPS,
-  COALESCE(SUM(IFF(NOT "Is Won" AND NETACV__C BETWEEN 0 AND 50000, NETACV__C, 0)),0) AS LOST_ACV,
-  COUNT(DISTINCT IFF(NOT "Is Won" AND NETACV__C BETWEEN 0 AND 50000, ID, NULL)) AS LOST_OPPS
-FROM BI_PRESENTATION.REPORT.VW_PIPELINE
-WHERE "Is Closed"
-  AND "Close Date" >= '2026-10-01' AND "Close Date" < '2027-01-01'
+  WON_ACV, WON_OPPS, LOST_ACV, LOST_OPPS,
+  MKT_ACV, SALES_ACV,
+  MKT_ACV + SALES_ACV AS SRC_TOTAL_ACV,
+  IFF(MKT_ACV + SALES_ACV > 0, MKT_ACV / (MKT_ACV + SALES_ACV), 0) AS MKT_MIX,
+  IFF(MKT_ACV + SALES_ACV > 0, SALES_ACV / (MKT_ACV + SALES_ACV), 0) AS SALES_MIX,
+  SEG_CORE, SEG_MID, SEG_ENT
+FROM agg
 """
 
     # 4) Funnel — Q4 open stages only (ACV metrics)
@@ -170,33 +204,7 @@ WHERE METRIC_NAME = 'Forecasted Net ACV'
   AND LEFT(STAGE,1) IN ('0','1','2')
 """
 
-    # 6a2) ONE open-VW aggregate — sourcing mix + segment actuals for TV (no second VW scan).
-    src_kpi = """
-SELECT
-  COALESCE(SUM(IFF("Lead Source"='Marketing', FCST_NETACV, 0)),0) AS MKT_ACV,
-  COALESCE(SUM(IFF("Lead Source"='Sales Generated', FCST_NETACV, 0)),0) AS SALES_ACV,
-  COALESCE(SUM(IFF("Lead Source" IN ('Marketing','Sales Generated'), FCST_NETACV, 0)),0) AS SRC_TOTAL_ACV,
-  IFF(
-    COALESCE(SUM(IFF("Lead Source" IN ('Marketing','Sales Generated'), FCST_NETACV, 0)),0) > 0,
-    COALESCE(SUM(IFF("Lead Source"='Marketing', FCST_NETACV, 0)),0)
-      / COALESCE(SUM(IFF("Lead Source" IN ('Marketing','Sales Generated'), FCST_NETACV, 0)),0),
-    0) AS MKT_MIX,
-  IFF(
-    COALESCE(SUM(IFF("Lead Source" IN ('Marketing','Sales Generated'), FCST_NETACV, 0)),0) > 0,
-    COALESCE(SUM(IFF("Lead Source"='Sales Generated', FCST_NETACV, 0)),0)
-      / COALESCE(SUM(IFF("Lead Source" IN ('Marketing','Sales Generated'), FCST_NETACV, 0)),0),
-    0) AS SALES_MIX,
-  COALESCE(SUM(IFF(CONTAINS("Segment",'Core'), FCST_NETACV, 0)),0) AS SEG_CORE,
-  COALESCE(SUM(IFF(CONTAINS("Segment",'Mid') OR "Segment"='MM', FCST_NETACV, 0)),0) AS SEG_MID,
-  COALESCE(SUM(IFF(CONTAINS("Segment",'Enterprise') OR CONTAINS("Segment",'Up-Market'), FCST_NETACV, 0)),0) AS SEG_ENT
-FROM BI_PRESENTATION.REPORT.VW_PIPELINE
-WHERE NOT "Is Closed"
-  AND LEFT("Stage Name",1) IN ('2','3','4','5','6','7')
-  AND FCST_NETACV BETWEEN 0 AND 5000000
-"""
-
-    # 6b) TV charts — ACV product + one open-VW CTE for SEG/SRC (Total page). ROTB early stays
-    # on kpi-open (ACV). ROTB sourcing uses kpi-src (same VW shape; warehouse result cache helps).
+    # 6b) TV charts — ACV product ONLY (no VW). SEG Actual injected client-side from kpi-vw.
     charts = """
 WITH prod_act AS (
   SELECT
@@ -212,18 +220,6 @@ WITH prod_act AS (
   FROM BI_STAGING.DATA.OPPORTUNITY_ACV_METRICS
   WHERE METRIC_NAME = 'Forecasted Net ACV' AND STAGE_GROUP = '2-7'
   GROUP BY 1
-),
-open_vw AS (
-  SELECT
-    COALESCE(SUM(IFF("Lead Source"='Marketing', FCST_NETACV, 0)),0) AS MKT_ACV,
-    COALESCE(SUM(IFF("Lead Source"='Sales Generated', FCST_NETACV, 0)),0) AS SALES_ACV,
-    COALESCE(SUM(IFF(CONTAINS("Segment",'Core'), FCST_NETACV, 0)),0) AS SEG_CORE,
-    COALESCE(SUM(IFF(CONTAINS("Segment",'Mid') OR "Segment"='MM', FCST_NETACV, 0)),0) AS SEG_MID,
-    COALESCE(SUM(IFF(CONTAINS("Segment",'Enterprise') OR CONTAINS("Segment",'Up-Market'), FCST_NETACV, 0)),0) AS SEG_ENT
-  FROM BI_PRESENTATION.REPORT.VW_PIPELINE
-  WHERE NOT "Is Closed"
-    AND LEFT("Stage Name",1) IN ('2','3','4','5','6','7')
-    AND FCST_NETACV BETWEEN 0 AND 5000000
 )
 SELECT 'SEG' AS GRAIN, t.DIM, 'Target' AS SERIES, t.TARGET AS VAL, NULL::FLOAT AS OPPS
 FROM (
@@ -231,16 +227,6 @@ FROM (
   UNION ALL SELECT 'Mid-Market', 16000000
   UNION ALL SELECT 'Enterprise', 20000000
 ) t
-UNION ALL
-SELECT 'SEG', 'Core', 'Actual', SEG_CORE, NULL FROM open_vw
-UNION ALL
-SELECT 'SEG', 'Mid-Market', 'Actual', SEG_MID, NULL FROM open_vw
-UNION ALL
-SELECT 'SEG', 'Enterprise', 'Actual', SEG_ENT, NULL FROM open_vw
-UNION ALL
-SELECT 'SRC', 'Marketing', 'Actual', MKT_ACV, NULL FROM open_vw
-UNION ALL
-SELECT 'SRC', 'Sales', 'Actual', SALES_ACV, NULL FROM open_vw
 UNION ALL
 SELECT 'PROD', t.DIM, 'Target', t.TARGET, NULL FROM (
   SELECT 'Insurance Intelligence' AS DIM, 31000000::FLOAT AS TARGET
@@ -264,10 +250,7 @@ SELECT 'PROD', a.DIM, 'Actual', a.ACTUAL, NULL FROM prod_act a
         ("YEAR_PCT_GOAL", p()), ("Q4_PCT_GOAL", p()),
         ("CLOSE_CY_PCT", p()), ("CLOSE_NY_PCT", p()), ("CLOSE_FY_PCT", p()),
     ]
-    closed_cols = [
-        ("WON_ACV", m()), ("WON_OPPS", None), ("LOST_ACV", m()), ("LOST_OPPS", None),
-    ]
-    # Daily open ACV trend — date-filtered snapshot (one job for Movement)
+    # Daily open ACV trend — date-filtered snapshot (Movement page only)
     snap = """
 SELECT SNAPSHOTDATE AS DT, COALESCE(SUM(FCST_NETACV),0) AS ACV
 FROM BI_STAGING.SNAPSHOT.VW_PIPELINE
@@ -281,7 +264,8 @@ GROUP BY 1
         ("S0_OPPS", None), ("S0_ACV", m()), ("S1_OPPS", None), ("S1_ACV", m()),
         ("S2_OPPS", None), ("S2_ACV", m()),
     ]
-    src_kpi_cols = [
+    vw_kpi_cols = [
+        ("WON_ACV", m()), ("WON_OPPS", None), ("LOST_ACV", m()), ("LOST_OPPS", None),
         ("MKT_ACV", m()), ("SALES_ACV", m()), ("SRC_TOTAL_ACV", m()),
         ("MKT_MIX", p()), ("SALES_MIX", p()),
         ("SEG_CORE", m()), ("SEG_MID", m()), ("SEG_ENT", m()),
@@ -289,12 +273,10 @@ GROUP BY 1
     return [
         sql_table("kpi-pack", "KPI Pack", pack, pack_cols),
         sql_table("kpi-walkin", "KPI Walkin", walkin, [("WALKIN_OPPS", None), ("WALKIN_ACV", m())]),
-        sql_table("kpi-closed", "KPI Closed Q4", closed, closed_cols),
-        # Early stages (ACV) — never blocked by VW
+        # Single VW_PIPELINE job for closed + sourcing + SEG
+        sql_table("kpi-vw", "KPI VW", vw_kpi, vw_kpi_cols),
         sql_table("kpi-open", "KPI Open", open_kpi, open_kpi_cols),
-        # Sourcing mix (1-row VW agg) — isolated warehouse job
-        sql_table("kpi-src", "KPI Sourcing", src_kpi, src_kpi_cols),
-        # Stage 2–7 charts for TV plugin (ACV prod + VW seg)
+        # ACV-only TV grain (fast); SEG Actual from kpi-vw via plugin
         sql_table("chart-tv", "Chart Target Actual Source", charts, [
             ("GRAIN", None), ("DIM", None), ("SERIES", None), ("VAL", m()), ("OPPS", None)]),
         sql_table("chart-funnel", "Chart Funnel", funnel, [
