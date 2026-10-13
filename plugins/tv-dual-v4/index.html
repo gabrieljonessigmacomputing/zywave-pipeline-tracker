@@ -176,13 +176,19 @@
     var rows = seg.slice();
     var tT = 0, tA = 0;
     rows.forEach(function (r) { tT += r.Target || 0; tA += r.Actual || 0; });
+    // No SEG Actual bind (Total stays off open-VW) — don't show a $0 attainment table.
+    if (tA <= 0) {
+      return '<div class="att"><h3>Attainment by New Segment</h3>' +
+        '<p style="margin:0;color:#64748b;font-size:12px;line-height:1.45">' +
+        'Segment targets shown above. Live segment actuals stay on <b>Pipeline Sourcing</b> ' +
+        '(open-VW) so this page stays fast. Product actuals use ACV metrics.</p></div>';
+    }
     if (rows.length) rows.push({ dim: "Total", Target: tT, Actual: tA });
     var h = '<div class="att"><h3>Attainment by New Segment</h3><table><thead><tr>' +
       '<th>Segment</th><th class="num">H2 Goal</th><th class="num">H2 Actual</th>' +
       '<th class="num">H2 Attainment</th><th class="num">H2 Pace</th></tr></thead><tbody>';
     rows.forEach(function (r) {
       var att = r.Target ? r.Actual / r.Target : 0;
-      // Pace vs calendar mid-year-ish: treat as attainment / elapsed; elapsed unknown → show attainment
       h += '<tr><td>' + esc(r.dim) + '</td><td class="num">' + esc(moneyFull(r.Target)) +
            '</td><td class="num">' + esc(moneyFull(r.Actual)) + '</td><td class="num">' +
            pill(att) + '</td><td class="num">' + pill(att) + '</td></tr>';
@@ -322,12 +328,17 @@
     root.style.display = "";
     var seg = groupRows(LAST, "SEG");
     var prod = groupRows(LAST, "PROD");
-    var src = groupRows(LAST, "SRC");
-    // Lead-source mix lives on ROTB / Sourcing as text heroes (wb-src) — keep TV focused on charts.
+    var segAct = 0;
+    seg.forEach(function (c) { segAct += c.Actual || 0; });
+    // Lead-source mix lives on Sourcing as text heroes — TV stays charts-only.
     root.innerHTML =
       '<div class="charts"><div class="panel" id="p-seg"></div><div class="panel" id="p-prod"></div></div>' +
       attainmentHtml(seg);
-    drawPanel(document.getElementById("p-seg"), "Pipeline by Segment: 2H Target vs Actual", seg);
+    drawPanel(
+      document.getElementById("p-seg"),
+      segAct > 0 ? "Pipeline by Segment: 2H Target vs Actual" : "Pipeline by Segment: 2H Target",
+      seg
+    );
     drawPanel(document.getElementById("p-prod"), "Pipeline by Product Group: 2H Target vs Actual", prod);
   }
 

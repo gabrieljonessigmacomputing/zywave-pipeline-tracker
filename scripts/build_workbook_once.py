@@ -258,12 +258,12 @@ def build():
         T("rk-cq", label("CLOSING THIS QUARTER") + "\n" + hero(ref(P, "Q4_ACV", "$,.2s"), BLUE, 32)),
         T("rk-nq", label("CLOSING NEXT QUARTER") + "\n" + hero(ref(P, "NQ_ACV", "$,.2s"), BLUE, 32)),
         T("rk-2q", label("CLOSING TWO QUARTERS OUT") + "\n" + hero(ref(P, "Q2OUT_ACV", "$,.2s"), BLUE, 32)),
-        T("rotb-s03", f'## <span style="color:{MUTED}">03 / PIPELINE MANAGEMENT</span>\nQ4 walk-in (closed won/lost on Open · Movement)'),
+        T("rotb-s03", f'## <span style="color:{MUTED}">03 / PIPELINE MANAGEMENT</span>\nQ4 walk-in (closed won/lost on Movement)'),
         C("mgmt-w"),
         T("rk-walk",
           label("WALK-IN (Q4 START)") + "\n" +
           hero(ref(W, "WALKIN_ACV", "$,.2s"), BLUE, 28) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">Frozen · {ref(W,"WALKIN_OPPS",",.0f")} opps · closed detail on Open / Movement</span></p>'),
+          f'<p class="p-small"><span style="color:{MUTED}">Frozen · {ref(W,"WALKIN_OPPS",",.0f")} opps · closed detail on Movement</span></p>'),
         T("rotb-s04", f'## <span style="color:{BLUE}">04 / EARLY STAGE PIPELINE</span>\nOpen Stage 0–2 · Snowflake SoT'),
         C("dm-s0"), C("dm-s1"), C("dm-s2", TEAL_BG, "#5eead4"), C("dm-mo"),
         T("dm-s0-b",
@@ -482,8 +482,9 @@ def build():
         },
         T("data-note", """# Fast path
 
-Open KPIs = 1-row KPI Open (ACV early + lean VW sourcing) → text heroes only.
-TV charts = ACV product + lean VW segment (Total page). No open-KPI plugins. No SumIf.
+ROTB / Open / Total / Created = ACV pack + walk-in + funnel (+ early open). No open-VW.
+Sourcing = open-VW 1-row (Lead Source + Segment). Movement = closed-VW Q4 + snapshot trend.
+TV = ACV product actuals; segment targets only on Total (segment actuals on Sourcing).
 """),
     ]
 
