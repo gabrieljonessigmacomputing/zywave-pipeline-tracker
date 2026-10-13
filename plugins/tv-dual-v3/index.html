@@ -246,7 +246,16 @@
   function renderKpi(mode, rows) {
     var k = parseKpi(rows);
     var h = "";
-    if (mode === "early") {
+    if (mode === "rotb") {
+      h = '<div class="kpi-grid early" style="margin-bottom:10px">' +
+        kpiCard("STAGE 0 OPEN", esc(money(k.S0)), esc(Math.round(k.S0o).toLocaleString() + " opportunities"), "blue", BLUE) +
+        kpiCard("STAGE 1 OPEN", esc(money(k.S1)), esc(Math.round(k.S1o).toLocaleString() + " opportunities"), "blue", BLUE) +
+        kpiCard("STAGE 2 OPEN", esc(money(k.S2)), esc(Math.round(k.S2o).toLocaleString() + " opportunities"), "teal", TEAL) +
+        '</div><div class="kpi-grid src">' +
+        kpiCard("MARKETING-SOURCED", esc(money(k.MKT)), "actual mix " + Math.round(k.mMix * 100) + "% · target 39%", "blue", BLUE) +
+        kpiCard("SALES-SOURCED", esc(money(k.SALES)), "actual mix " + Math.round(k.sMix * 100) + "% · target 61%", "", ORANGE) +
+        '</div>';
+    } else if (mode === "early") {
       h = '<div class="kpi-grid early">' +
         kpiCard("STAGE 0 OPEN", esc(money(k.S0)), esc(Math.round(k.S0o).toLocaleString() + " opportunities"), "blue", BLUE) +
         kpiCard("STAGE 1 OPEN", esc(money(k.S1)), esc(Math.round(k.S1o).toLocaleString() + " opportunities"), "blue", BLUE) +
@@ -316,7 +325,7 @@
       var t = (cfg && cfg.title) || "charts";
       if (typeof t === "object") t = t.value || t.id || "charts";
       t = String(t || "charts").toLowerCase().trim();
-      LAYOUT = /^(early|src|mix|left|charts)$/.test(t) ? t : "charts";
+      LAYOUT = /^(early|src|mix|left|rotb|charts)$/.test(t) ? t : "charts";
       if (!cfg || !sourceId(cfg.source) || !colKey(cfg.grain) || !colKey(cfg.dim) ||
           !colKey(cfg.series) || !colKey(cfg.val)) {
         if (!LAST) render(synth());

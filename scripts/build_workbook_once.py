@@ -194,7 +194,6 @@ def build():
         }
 
     def open_kpi_plugin(eid, mode, src_eid="wb-tv"):
-        # Same approved TV plugin; mode via title (text config) — avoids unknown config keys.
         return {
             "id": eid, "kind": "plugin", "pluginId": TV_ID, "displayName": f"Open KPIs ({mode})",
             "config": {
@@ -279,15 +278,14 @@ def build():
           hero(ref(Z, "WON_ACV", "$,.2s"), GREEN, 28) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">{ref(Z,"WON_OPPS",",.0f")} opportunities</span></p>'),
         T("rotb-s04", f'## <span style="color:{BLUE}">04 / EARLY STAGE PIPELINE</span>\nOpen Stage 0–2 · live from VW_PIPELINE'),
-        C("dm-early"), C("dm-mo"),
-        open_kpi_plugin("plugin-early", "early"),
+        C("dm-mo"),
+        # Single tall plugin (early+src stacked) — multiple TV plugin instances stall on ROTB.
+        open_kpi_plugin("plugin-early", "rotb"),
         T("dm-mo-b",
           label("STAGE 2 CREATED THIS MONTH") + "\n" +
           hero(ref(P, "MONTH_ACV", "$,.2s"), ORANGE, 28) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"MONTH_OPPS",",.0f")} opportunities</span></p>'),
-        T("rotb-s05", f'## <span style="color:{ORANGE}">05 / SALES PIPELINE GENERATION</span>\nOpen Stage 2+ by Lead Source'),
-        C("sg-src"),
-        open_kpi_plugin("plugin-src", "src"),
+        T("rotb-s05", f'## <span style="color:{ORANGE}">05 / SALES PIPELINE GENERATION</span>\n(see tiles above · same open VW scan)'),
         T("rotb-progress",
           f'<p class="p-small"><span style="color:{MUTED}">Year progress {ref(P,"YEAR_ELAPSED",".0%")} · '
           f'Quarter progress {ref(P,"Q4_ELAPSED",".0%")}</span></p>'),
@@ -329,7 +327,9 @@ def build():
           f'<p class="p-small"><span style="color:{MUTED}">{ref(Z,"LOST_OPPS",",.0f")} opps · ≤ $50k</span></p>'),
         T("mv-also", f'<p class="p-small"><span style="color:{MUTED}">ALSO LEFT PIPELINE</span></p>'),
         C("mv-won-c", GREEN_BG, "#bbf7d0"), C("mv-early-c", RED_BG, "#fecaca"),
-        open_kpi_plugin("plugin-left", "left"),
+        T("mv-early",
+          f'<p class="p-small"><span style="color:{RED}">Early stage open (S0+S1)</span></p>\n'
+          f'<p class="p-small"><span style="color:{MUTED}">See ROTB early tiles · same chart-tv scan</span></p>'),
         T("mv-won",
           f'<p class="p-small"><span style="color:{GREEN}">Closed Won</span></p>\n'
           + hero(ref(Z, "WON_ACV", "$,.2s"), GREEN, 26) + "\n" +
@@ -362,18 +362,18 @@ def build():
           label("PIPELINE TO CLOSE 2 QUARTERS OUT") + "\n" +
           hero(ref(P, "Q2OUT_ACV", "$,.2s")) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">Q2 2027 · {ref(P,"Q2OUT_OPPS",",.0f")} open deals</span></p>'),
-        tv_plugin("plugin-tv"),
+        # DEBUG: only ONE tv plugin in workbook (on ROTB as plugin-early). Re-add Total after.
         T("total-defs",
           f'<p class="p-small"><span style="color:{MUTED}">Up-Market = Mid-Market + Enterprise · '
-          f'Insurance Intelligence = Analytics + Client + Content · RQC &amp; AMS = RQC + Service</span></p>'),
+          f'Insurance Intelligence = Analytics + Client + Content · RQC &amp; AMS = RQC + Service</span></p>\n'
+          f'<p class="p-small"><span style="color:{MUTED}">Target vs Actual charts temporarily on ROTB (plugin-early) while validating data path.</span></p>'),
     ]
 
     # ═══════════════ SOURCING ═══════════════
     els += [
         T("sourcing-title", f'# Pipeline Sourcing\n<p class="p-small"><span style="color:{MUTED}">Marketing vs Sales by deal type · Stage 2+</span></p>'),
-        open_kpi_plugin("plugin-mix", "mix"),
         T("sk-note",
-          f'<p class="p-small"><span style="color:{MUTED}">Open Stage 2+ by Lead Source · same chart-tv KPI grain as ROTB · Q4 FY2026</span></p>'),
+          f'<p class="p-small"><span style="color:{MUTED}">Open Stage 2+ mix lives on ROTB · same chart-tv KPI grain · Q4 FY2026</span></p>'),
     ]
 
     # ═══════════════ MOVEMENT ═══════════════
@@ -511,17 +511,14 @@ Pace / funnel / TV / open-KPI plugins subscribe to pass-through tables (no SumIf
             Cont("mgmt-l", 9, 17, 2, 6, [L("rk-lost", 1, 25, 1, 8)], 2),
             Cont("mgmt-n", 17, 25, 2, 6, [L("rk-won2", 1, 25, 1, 8)], 2),
         ]),
-        Cont("sec-04", 1, 25, 23, 28, [
-            L("rotb-s04", 1, 25, 1, 2),
-            Cont("dm-early", 1, 19, 2, 6, [L("plugin-early", 1, 25, 1, 8)], 2),
-            Cont("dm-mo", 19, 25, 2, 6, [L("dm-mo-b", 1, 25, 1, 8)], 2),
+        Cont("sec-04", 1, 25, 23, 25, [
+            L("rotb-s04", 1, 19, 1, 2),
+            Cont("dm-mo", 19, 25, 1, 3, [L("dm-mo-b", 1, 25, 1, 8)], 2),
         ]),
-        Cont("sec-05", 1, 25, 28, 33, [
-            L("rotb-s05", 1, 25, 1, 2),
-            Cont("sg-src", 1, 25, 2, 6, [L("plugin-src", 1, 25, 1, 8)], 2),
-        ]),
-        # Keep wb-tv on ROTB so chart-tv runs when this page loads (plugins alone can stall).
-        E("wb-tv", 1, 2, 33, 34),
+        # Tall direct placement (same pattern as Total plugin-tv)
+        E("plugin-early", 1, 25, 25, 42),
+        E("rotb-s05", 1, 25, 42, 43),
+        E("wb-tv", 1, 2, 43, 44),
     ]
     open_l = [
         E("open-title", 1, 18, 1, 3), E("open-live", 18, 25, 1, 3),
@@ -537,7 +534,7 @@ Pace / funnel / TV / open-KPI plugins subscribe to pass-through tables (no SumIf
             Cont("mv-walk-c", 15, 20, 3, 7, [L("mv-walk", 1, 25, 1, 8)], 2),
             Cont("mv-lost-c", 20, 25, 3, 7, [L("mv-lost", 1, 25, 1, 8)], 2),
             L("mv-also", 15, 25, 7, 8),
-            Cont("mv-early-c", 15, 20, 8, 12, [L("plugin-left", 1, 25, 1, 8)], 2),
+            Cont("mv-early-c", 15, 20, 8, 12, [L("mv-early", 1, 25, 1, 8)], 2),
             Cont("mv-won-c", 20, 25, 8, 12, [L("mv-won", 1, 25, 1, 8)], 2),
             L("mv-add", 15, 25, 12, 13),
             Cont("mv-cr-c", 15, 20, 13, 17, [L("mv-cr", 1, 25, 1, 8)], 2),
@@ -549,13 +546,11 @@ Pace / funnel / TV / open-KPI plugins subscribe to pass-through tables (no SumIf
         Cont("tc-1", 1, 9, 3, 8, [L("tk-cq", 1, 25, 1, 8)]),
         Cont("tc-2", 9, 17, 3, 8, [L("tk-nq", 1, 25, 1, 8)]),
         Cont("tc-3", 17, 25, 3, 8, [L("tk-2q", 1, 25, 1, 8)]),
-        E("plugin-tv", 1, 25, 8, 26),
-        E("total-defs", 1, 25, 26, 28),
+        E("total-defs", 1, 25, 8, 12),
     ]
     sourcing_l = [
         E("sourcing-title", 1, 18, 1, 3), E("ctrl-period", 18, 25, 1, 3),
-        E("plugin-mix", 1, 25, 3, 12),
-        E("sk-note", 1, 25, 12, 14),
+        E("sk-note", 1, 25, 3, 6),
     ]
     movement_l = [
         E("movement-title", 1, 25, 1, 3),
