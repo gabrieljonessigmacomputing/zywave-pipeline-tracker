@@ -142,6 +142,17 @@ early AS (
   FROM BI_STAGING.DATA.OPPORTUNITY_ACV_METRICS
   WHERE METRIC_NAME = 'Forecasted Net ACV'
     AND LEFT(STAGE,1) IN ('0','1','2')
+),
+-- Tiny snapshot join — same freeze as kpi-walkin (keeps bridge residual on pack).
+walkin AS (
+  SELECT COUNT(*) AS WALKIN_OPPS, COALESCE(SUM(v),0) AS WALKIN_ACV FROM (
+    SELECT OPPORTUNITYID, MAX(FCST_NETACV) AS v
+    FROM BI_STAGING.SNAPSHOT.VW_PIPELINE
+    WHERE SNAPSHOTDATE = '2026-10-01'
+      AND LEFT(STAGE_NAME,1) IN ('2','3','4','5','6','7')
+      AND CLOSE_DATE >= '2026-10-01' AND CLOSE_DATE < '2027-01-01'
+    GROUP BY 1 HAVING MAX(FCST_NETACV) BETWEEN 0 AND 2000000
+  )
 )
 SELECT o.*, c.*, z.*, e.*,
   {YEAR_GOAL}::FLOAT AS YEAR_GOAL, {Q4_GOAL}::FLOAT AS Q4_GOAL,
@@ -151,8 +162,19 @@ SELECT o.*, c.*, z.*, e.*,
   c.Q4_CREATED_ACV/{Q4_GOAL} AS Q4_PCT_GOAL,
   IFF(o.TOTAL_ACV>0, o.CLOSE_CY_ACV/o.TOTAL_ACV, 0) AS CLOSE_CY_PCT,
   IFF(o.TOTAL_ACV>0, o.CLOSE_NY_ACV/o.TOTAL_ACV, 0) AS CLOSE_NY_PCT,
-  IFF(o.TOTAL_ACV>0, o.CLOSE_FY_ACV/o.TOTAL_ACV, 0) AS CLOSE_FY_PCT
-FROM open_acv o CROSS JOIN created c CROSS JOIN closed z CROSS JOIN early e
+  IFF(o.TOTAL_ACV>0, o.CLOSE_FY_ACV/o.TOTAL_ACV, 0) AS CLOSE_FY_PCT,
+  w.WALKIN_OPPS AS PACK_WALKIN_OPPS, w.WALKIN_ACV AS PACK_WALKIN_ACV,
+  -- Coverage: open ACV / creation goals (stills Coverage page)
+  IFF({Q4_GOAL}>0, o.Q4_ACV/{Q4_GOAL}, 0) AS Q4_COVERAGE,
+  IFF({YEAR_GOAL}>0, o.TOTAL_ACV/{YEAR_GOAL}, 0) AS YEAR_COVERAGE,
+  -- Bridge residual (stills "Other Adjustments"): open − (walk-in + created − won − lost)
+  o.TOTAL_ACV - (w.WALKIN_ACV + c.Q4_CREATED_ACV - z.WON_ACV - z.LOST_ACV) AS OTHER_ADJ_ACV,
+  o.Q4_ACV - (w.WALKIN_ACV + c.Q4_CREATED_ACV - z.WON_ACV - z.LOST_ACV) AS Q4_OTHER_ADJ_ACV
+FROM open_acv o
+CROSS JOIN created c
+CROSS JOIN closed z
+CROSS JOIN early e
+CROSS JOIN walkin w
 """
 
     # 2) Walk-in — tiny snapshot (date-partitioned)
@@ -271,13 +293,26 @@ WHERE METRIC_NAME='Forecasted Net ACV' AND STAGE_GROUP='2-7'
 GROUP BY 1,2
 """
 
-    # 5) Created by month — short window
+    # 5) Created YoY by quarter (stills) — long format for grouped bars; still ACV-only
     created_month = """
-SELECT DATE_TRUNC('month', STAGE_2_DATETIME) AS MONTH, COALESCE(SUM(METRIC_VALUE),0) AS ACV
-FROM BI_STAGING.DATA.OPPORTUNITY_ACV_METRICS
-WHERE METRIC_NAME='Forecasted Net ACV' AND STAGE_2_ATTAINED
-  AND STAGE_2_DATETIME >= '2025-10-01'
-GROUP BY 1
+WITH q AS (
+  SELECT
+    QUARTER(STAGE_2_DATETIME) AS QN,
+    YEAR(STAGE_2_DATETIME) AS YR,
+    COALESCE(SUM(METRIC_VALUE),0) AS ACV
+  FROM BI_STAGING.DATA.OPPORTUNITY_ACV_METRICS
+  WHERE METRIC_NAME='Forecasted Net ACV' AND STAGE_2_ATTAINED = TRUE
+    AND STAGE_2_DATETIME >= '2025-01-01' AND STAGE_2_DATETIME < '2027-01-01'
+    AND METRIC_VALUE BETWEEN 0 AND 5000000
+  GROUP BY 1, 2
+)
+SELECT
+  'Q' || QN AS QUARTER,
+  QN AS ORD,
+  'FY' || YR AS FY,
+  ACV
+FROM q
+WHERE YR IN (2025, 2026)
 """
 
     # 6) Close month × stage — ACV open FY2026 (Open page only; no VW)
@@ -348,6 +383,9 @@ SELECT 'PROD', a.DIM, 'Actual', a.ACTUAL, NULL FROM prod_act a
         ("YEAR_ELAPSED", p()), ("Q4_ELAPSED", p()),
         ("YEAR_PCT_GOAL", p()), ("Q4_PCT_GOAL", p()),
         ("CLOSE_CY_PCT", p()), ("CLOSE_NY_PCT", p()), ("CLOSE_FY_PCT", p()),
+        ("PACK_WALKIN_OPPS", None), ("PACK_WALKIN_ACV", m()),
+        ("Q4_COVERAGE", p()), ("YEAR_COVERAGE", p()),
+        ("OTHER_ADJ_ACV", m()), ("Q4_OTHER_ADJ_ACV", m()),
     ]
     src_kpi_cols = [
         ("MKT_ACV", m()), ("SALES_ACV", m()), ("SRC_TOTAL_ACV", m()),
@@ -375,7 +413,7 @@ SELECT 'PROD', a.DIM, 'Actual', a.ACTUAL, NULL FROM prod_act a
         sql_table("chart-funnel", "Chart Funnel", funnel, [
             ("STAGE", None), ("ORD", None), ("ACV", m())]),
         sql_table("chart-created", "Chart Created", created_month, [
-            ("MONTH", {"kind": "datetime", "formatString": "%b %Y"}), ("ACV", m())]),
+            ("QUARTER", None), ("ORD", None), ("FY", None), ("ACV", m())]),
         sql_table("chart-closemo", "Chart Close Month Stage", close_mo, [
             ("MONTH", {"kind": "datetime", "formatString": "%b %Y"}),
             ("STAGE", None), ("ORD", None), ("ACV", m()), ("OPPS", None)]),

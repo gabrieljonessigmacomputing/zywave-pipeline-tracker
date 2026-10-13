@@ -125,6 +125,9 @@ def build():
         ("YEAR_ELAPSED", p()), ("Q4_ELAPSED", p()),
         ("YEAR_PCT_GOAL", p()), ("Q4_PCT_GOAL", p()),
         ("CLOSE_CY_PCT", p()), ("CLOSE_NY_PCT", p()), ("CLOSE_FY_PCT", p()),
+        ("PACK_WALKIN_OPPS", None), ("PACK_WALKIN_ACV", m()),
+        ("Q4_COVERAGE", p()), ("YEAR_COVERAGE", p()),
+        ("OTHER_ADJ_ACV", m()), ("Q4_OTHER_ADJ_ACV", m()),
     ]
     els += [
         pass_tbl("wb-pack", "WB Pack", "kpi-pack", "KPI Pack", pack_cols),
@@ -448,6 +451,25 @@ def build():
     # ═══════════════ TOTAL ═══════════════
     els += [
         T("total-title", f'# Total Company\n<p class="p-small"><span style="color:{MUTED}">ACV-fast · product actuals + segment 2H targets (segment actuals on Sourcing)</span></p>'),
+        C("tc-att-y", TEAL_BG, "#99f6e4"), C("tc-att-q", AMBER_BG, "#fbbf24"), C("tc-att-cov", "#eff6ff", "#93c5fd"), C("tc-att-ytd"),
+        T("tk-att-y",
+          label("YEAR CREATION ATTAINMENT") + "\n" +
+          hero(ref(P, "YEAR_PCT_GOAL", ".1%"), TEAL, 28) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"YTD_ACV","$,.2s")} / {ref(P,"YEAR_GOAL","$,.2s")} · '
+          f'{ref(P,"YEAR_ELAPSED",".0%")} elapsed</span></p>'),
+        T("tk-att-q",
+          label("Q4 CREATION ATTAINMENT") + "\n" +
+          hero(ref(P, "Q4_PCT_GOAL", ".1%"), ORANGE, 28) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"Q4_CREATED_ACV","$,.2s")} / {ref(P,"Q4_GOAL","$,.2s")} · '
+          f'{ref(P,"Q4_ELAPSED",".0%")} elapsed</span></p>'),
+        T("tk-att-cov",
+          label("Q4 OPEN COVERAGE") + "\n" +
+          hero(ref(P, "Q4_COVERAGE", ".1%"), BLUE, 28) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">Q4 open / Q4 creation goal</span></p>'),
+        T("tk-att-ytd",
+          label("YTD PIPELINE CREATED") + "\n" +
+          hero(ref(P, "YTD_ACV", "$,.2s"), INK, 28) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">Stage 2+ attained · FY2026</span></p>'),
         C("tc-1"), C("tc-2"), C("tc-3"),
         T("tk-cq",
           label("PIPELINE TO CLOSE IN CURRENT QUARTER") + "\n" +
@@ -677,6 +699,12 @@ def build():
         T("ck-won", label("WON") + "\n" + hero(ref(P, "WON_ACV", "$,.2s"), GREEN, 22)),
         T("ck-minus2", f'<p class="p-small" style="text-align:center"><span style="font-size:28px;color:{MUTED}">−</span></p>'),
         T("ck-lost", label("LOST") + "\n" + hero(ref(P, "LOST_ACV", "$,.2s"), RED, 22)),
+        T("ck-plus2", f'<p class="p-small" style="text-align:center"><span style="font-size:28px;color:{MUTED}">+</span></p>'),
+        C("cc-adj", AMBER_BG, "#fbbf24"),
+        T("ck-adj",
+          label("OTHER ADJ") + "\n" +
+          hero(ref(P, "OTHER_ADJ_ACV", "$,.2s"), ORANGE, 22) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">Residual vs walk-in bridge</span></p>'),
         T("ck-eq", f'<p class="p-small" style="text-align:center"><span style="font-size:28px;color:{MUTED}">≈</span></p>'),
         T("ck-tot", label("TOTAL OPEN") + "\n" + hero(ref(P, "TOTAL_ACV", "$,.2s"), BLUE, 22)),
         T("close-h", f'## Total open pipeline by close year\n<span style="color:{MUTED}">Share of open ACV</span>'),
@@ -693,27 +721,95 @@ def build():
           label("FUTURE YEARS (2028+)") + "\n" +
           hero(ref(P, "CLOSE_FY_ACV", "$,.0f"), MUTED, 26) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"CLOSE_FY_PCT",".0%")} of open</span></p>'),
-        # Chart sources DM directly — no pass-through table (avoids CREATED_MO ×2).
+        T("yoy-h", f'## Pipeline Created by Quarter — YoY\n<span style="color:{MUTED}">FY2025 vs FY2026 · Stage 2+ attained · ACV metrics</span>'),
         {
-            "id": "chart-created", "kind": "bar-chart", "name": "Pipeline Created by Month (Stage 2+)",
+            "id": "chart-created", "kind": "bar-chart", "name": "Pipeline Created YoY by Quarter",
             "source": dm("chart-created"),
             "columns": [
-                {"id": "ccm-m", "name": "Month", "formula": "[Chart Created/MONTH]",
-                 "format": {"kind": "datetime", "formatString": "%b %Y"}},
+                {"id": "ccm-q", "name": "Quarter", "formula": "[Chart Created/QUARTER]"},
+                {"id": "ccm-ord", "name": "Ord", "formula": "[Chart Created/ORD]"},
+                {"id": "ccm-fy", "name": "FY", "formula": "[Chart Created/FY]"},
                 {"id": "ccm-v", "name": "ACV", "formula": "[Chart Created/ACV]",
                  "format": {"kind": "number", "formatString": "$,.2s"}},
             ],
-            "xAxis": {"columnId": "ccm-m"}, "yAxis": {"columnIds": ["ccm-v"]},
-            "color": {"by": "single", "value": TEAL},
+            "xAxis": {"columnId": "ccm-q"}, "yAxis": {"columnIds": ["ccm-v"]},
+            "color": {
+                "by": "category", "column": "ccm-fy",
+                "scheme": ["#94a3b8", "#38bdf8"],
+            },
             "style": {"backgroundColor": WHITE, "borderRadius": "round", "borderColor": BORDER, "borderWidth": 1},
         },
         T("data-note", """# Fast path
 
-Hot pages = ACV pack (open/created/won/lost/early/size) + walk-in + funnel/TV
-+ Open close-month×stage + product bars.
+Hot pages = ACV pack (open/created/won/lost/early/size/bridge residual/coverage) + walk-in + funnel/TV
++ Open close-month×stage + product bars + Created YoY quarters.
 Sourcing only = open presentation VW (Lead Source × Opp Type × SplitSegment).
-No daily snapshot grain — Movement uses pack bridge.
+Coverage / ABM = pack chrome (no open-VW). No daily snapshot grain.
 """),
+    ]
+
+    # ═══════════════ COVERAGE (stills) — pack only, no open-VW ═══════════════
+    els += [
+        T("cov-title", f'# Pipeline Coverage\n<p class="p-small"><span style="color:{MUTED}">Plan vs open coverage · ACV pack · segment tagged actuals on Sourcing</span></p>'),
+        C("covp-1", TEAL_BG, "#99f6e4"), C("covp-2", "#eff6ff", "#93c5fd"), C("covp-3"), C("covp-4", AMBER_BG, "#fbbf24"),
+        T("cov-k1",
+          label("TOTAL OPEN / YEAR GOAL") + "\n" +
+          hero(ref(P, "YEAR_COVERAGE", ".1%"), TEAL, 32) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"TOTAL_ACV","$,.2s")} open · goal {ref(P,"YEAR_GOAL","$,.2s")}</span></p>'),
+        T("cov-k2",
+          label("Q4 OPEN / Q4 GOAL") + "\n" +
+          hero(ref(P, "Q4_COVERAGE", ".1%"), BLUE, 32) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"Q4_ACV","$,.2s")} open · goal {ref(P,"Q4_GOAL","$,.2s")}</span></p>'),
+        T("cov-k3",
+          label("Q4 OPEN PIPELINE") + "\n" +
+          hero(ref(P, "Q4_ACV", "$,.2s"), INK, 32) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"Q4_OPPS",",.0f")} opps · Stage 2+</span></p>'),
+        T("cov-k4",
+          label("NEXT QUARTER OPEN") + "\n" +
+          hero(ref(P, "NQ_ACV", "$,.2s"), ORANGE, 32) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"NQ_OPPS",",.0f")} opps · Q1 2027</span></p>'),
+        T("cov-seg-h", f'## Segment 2H plan coverage\n<span style="color:{MUTED}">Targets chrome · tagged open actuals live on Pipeline Sourcing</span>'),
+        C("cov-sc"), C("cov-sm"), C("cov-se"), C("cov-st", TEAL_BG, "#99f6e4"),
+        T("cov-sc-b",
+          label("CORE · 2H TARGET") + "\n" +
+          hero("$18M", BLUE, 26) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">Actuals → Sourcing</span></p>'),
+        T("cov-sm-b",
+          label("MID-MARKET · 2H TARGET") + "\n" +
+          hero("$16M", TEAL, 26) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">Actuals → Sourcing</span></p>'),
+        T("cov-se-b",
+          label("ENTERPRISE · 2H TARGET") + "\n" +
+          hero("$20M", ORANGE, 26) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">Actuals → Sourcing</span></p>'),
+        T("cov-st-b",
+          label("TOTAL OPEN (PACK)") + "\n" +
+          hero(ref(P, "TOTAL_ACV", "$,.2s"), TEAL, 26) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">Year coverage {ref(P,"YEAR_COVERAGE",".1%")}</span></p>'),
+        T("cov-note",
+          f'<p class="p-small"><span style="color:{MUTED}">Coverage ratios use creation goals as the plan denominator (stills). '
+          f'Segment % of 2H goal requires open-VW tags — kept on Pipeline Sourcing so this page stays hot.</span></p>'),
+    ]
+
+    # ═══════════════ ABM (stills) — frozen baseline chrome ═══════════════
+    els += [
+        T("abm-title", f'# Q4 Big Bet ABM Plays\n<p class="p-small"><span style="color:{MUTED}">Frozen ABM opportunity baseline · October snapshot</span></p>'),
+        C("abm-1", AMBER_BG, "#fbbf24"), C("abm-2"), C("abm-3", TEAL_BG, "#99f6e4"),
+        T("abm-k1",
+          label("BASELINE STATUS") + "\n" +
+          hero("Frozen", ORANGE, 28) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">ABM playbook feed not in ACV pack</span></p>'),
+        T("abm-k2",
+          label("Q4 OPEN CONTEXT") + "\n" +
+          hero(ref(P, "Q4_ACV", "$,.2s"), INK, 28) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">Company Q4 open · {ref(P,"Q4_OPPS",",.0f")} opps</span></p>'),
+        T("abm-k3",
+          label("WALK-IN (Q4 START)") + "\n" +
+          hero(ref(W, "WALKIN_ACV", "$,.2s"), TEAL, 28) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">Frozen snapshot · {ref(W,"WALKIN_OPPS",",.0f")} opps</span></p>'),
+        T("abm-note",
+          f'<p class="p-small"><span style="color:{MUTED}">Stills ABM list is a frozen Salesforce baseline. '
+          f'When the ABM opportunity table lands in Snowflake, bind it here — never fan open-VW into hot pages.</span></p>'),
     ]
 
     def L(e, a, b, c, d):
@@ -802,21 +898,25 @@ No daily snapshot grain — Movement uses pack bridge.
     ]
     total_l = [
         E("total-title", 1, 25, 1, 3),
-        Cont("tc-1", 1, 9, 3, 8, [L("tk-cq", 1, 25, 1, 8)]),
-        Cont("tc-2", 9, 17, 3, 8, [L("tk-nq", 1, 25, 1, 8)]),
-        Cont("tc-3", 17, 25, 3, 8, [L("tk-2q", 1, 25, 1, 8)]),
-        E("plugin-tv", 1, 25, 8, 22),
-        E("total-early-h", 1, 25, 22, 24),
-        Cont("te-s0", 1, 7, 24, 29, [L("te-s0-b", 1, 25, 1, 2)]),
-        Cont("te-s1", 7, 13, 24, 29, [L("te-s1-b", 1, 25, 1, 2)]),
-        Cont("te-s2", 13, 19, 24, 29, [L("te-s2-b", 1, 25, 1, 2)]),
-        Cont("te-mo", 19, 25, 24, 29, [L("te-mo-b", 1, 25, 1, 2)]),
-        E("total-seg-h", 1, 25, 29, 31),
-        Cont("ts-core", 1, 7, 31, 36, [L("ts-core-b", 1, 25, 1, 2)]),
-        Cont("ts-mid", 7, 13, 31, 36, [L("ts-mid-b", 1, 25, 1, 2)]),
-        Cont("ts-ent", 13, 19, 31, 36, [L("ts-ent-b", 1, 25, 1, 2)]),
-        Cont("ts-tot", 19, 25, 31, 36, [L("ts-tot-b", 1, 25, 1, 2)]),
-        E("total-defs", 1, 25, 36, 38),
+        Cont("tc-att-y", 1, 7, 3, 8, [L("tk-att-y", 1, 25, 1, 2)]),
+        Cont("tc-att-q", 7, 13, 3, 8, [L("tk-att-q", 1, 25, 1, 2)]),
+        Cont("tc-att-cov", 13, 19, 3, 8, [L("tk-att-cov", 1, 25, 1, 2)]),
+        Cont("tc-att-ytd", 19, 25, 3, 8, [L("tk-att-ytd", 1, 25, 1, 2)]),
+        Cont("tc-1", 1, 9, 8, 13, [L("tk-cq", 1, 25, 1, 2)]),
+        Cont("tc-2", 9, 17, 8, 13, [L("tk-nq", 1, 25, 1, 2)]),
+        Cont("tc-3", 17, 25, 8, 13, [L("tk-2q", 1, 25, 1, 2)]),
+        E("plugin-tv", 1, 25, 13, 27),
+        E("total-early-h", 1, 25, 27, 29),
+        Cont("te-s0", 1, 7, 29, 34, [L("te-s0-b", 1, 25, 1, 2)]),
+        Cont("te-s1", 7, 13, 29, 34, [L("te-s1-b", 1, 25, 1, 2)]),
+        Cont("te-s2", 13, 19, 29, 34, [L("te-s2-b", 1, 25, 1, 2)]),
+        Cont("te-mo", 19, 25, 29, 34, [L("te-mo-b", 1, 25, 1, 2)]),
+        E("total-seg-h", 1, 25, 34, 36),
+        Cont("ts-core", 1, 7, 36, 41, [L("ts-core-b", 1, 25, 1, 2)]),
+        Cont("ts-mid", 7, 13, 36, 41, [L("ts-mid-b", 1, 25, 1, 2)]),
+        Cont("ts-ent", 13, 19, 36, 41, [L("ts-ent-b", 1, 25, 1, 2)]),
+        Cont("ts-tot", 19, 25, 36, 41, [L("ts-tot-b", 1, 25, 1, 2)]),
+        E("total-defs", 1, 25, 41, 43),
     ]
     sourcing_l = [
         E("sourcing-title", 1, 18, 1, 3), E("ctrl-period", 18, 25, 1, 3),
@@ -864,26 +964,49 @@ No daily snapshot grain — Movement uses pack bridge.
     ]
     created_l = [
         E("created-title", 1, 25, 1, 3),
-        Cont("ckp-1", 1, 6, 3, 8, [L("ckp-week", 1, 25, 1, 8)]),
-        Cont("ckp-2", 6, 11, 3, 8, [L("ckp-qtr", 1, 25, 1, 8)]),
-        Cont("ckp-3", 11, 16, 3, 8, [L("ckp-month", 1, 25, 1, 8)]),
-        Cont("ckp-4", 16, 21, 3, 8, [L("ckp-ccq", 1, 25, 1, 8)]),
-        Cont("ckp-5", 21, 25, 3, 8, [L("ckp-won", 1, 25, 1, 8)]),
+        Cont("ckp-1", 1, 6, 3, 8, [L("ckp-week", 1, 25, 1, 2)]),
+        Cont("ckp-2", 6, 11, 3, 8, [L("ckp-qtr", 1, 25, 1, 2)]),
+        Cont("ckp-3", 11, 16, 3, 8, [L("ckp-month", 1, 25, 1, 2)]),
+        Cont("ckp-4", 16, 21, 3, 8, [L("ckp-ccq", 1, 25, 1, 2)]),
+        Cont("ckp-5", 21, 25, 3, 8, [L("ckp-won", 1, 25, 1, 2)]),
         E("bridge-h", 1, 25, 8, 10),
-        Cont("cc-start", 1, 5, 10, 15, [L("ck-start", 1, 25, 1, 8)]),
-        E("ck-plus", 5, 6, 10, 15),
-        Cont("cc-cr", 6, 10, 10, 15, [L("ck-cr", 1, 25, 1, 8)]),
-        E("ck-minus1", 10, 11, 10, 15),
-        Cont("cc-won", 11, 15, 10, 15, [L("ck-won", 1, 25, 1, 8)]),
-        E("ck-minus2", 15, 16, 10, 15),
-        Cont("cc-lost", 16, 20, 10, 15, [L("ck-lost", 1, 25, 1, 8)]),
-        E("ck-eq", 20, 21, 10, 15),
-        Cont("cc-tot", 21, 25, 10, 15, [L("ck-tot", 1, 25, 1, 8)]),
+        Cont("cc-start", 1, 4, 10, 15, [L("ck-start", 1, 25, 1, 2)]),
+        E("ck-plus", 4, 5, 10, 15),
+        Cont("cc-cr", 5, 8, 10, 15, [L("ck-cr", 1, 25, 1, 2)]),
+        E("ck-minus1", 8, 9, 10, 15),
+        Cont("cc-won", 9, 12, 10, 15, [L("ck-won", 1, 25, 1, 2)]),
+        E("ck-minus2", 12, 13, 10, 15),
+        Cont("cc-lost", 13, 16, 10, 15, [L("ck-lost", 1, 25, 1, 2)]),
+        E("ck-plus2", 16, 17, 10, 15),
+        Cont("cc-adj", 17, 21, 10, 15, [L("ck-adj", 1, 25, 1, 2)]),
+        E("ck-eq", 21, 22, 10, 15),
+        Cont("cc-tot", 22, 25, 10, 15, [L("ck-tot", 1, 25, 1, 2)]),
         E("close-h", 1, 25, 15, 17),
-        Cont("cc-cy", 1, 9, 17, 21, [L("ck-cy", 1, 25, 1, 8)]),
-        Cont("cc-ny", 9, 17, 17, 21, [L("ck-ny", 1, 25, 1, 8)]),
-        Cont("cc-fy", 17, 25, 17, 21, [L("ck-fy", 1, 25, 1, 8)]),
-        E("chart-created", 1, 25, 21, 31),
+        Cont("cc-cy", 1, 9, 17, 21, [L("ck-cy", 1, 25, 1, 2)]),
+        Cont("cc-ny", 9, 17, 17, 21, [L("ck-ny", 1, 25, 1, 2)]),
+        Cont("cc-fy", 17, 25, 17, 21, [L("ck-fy", 1, 25, 1, 2)]),
+        E("yoy-h", 1, 25, 21, 23),
+        E("chart-created", 1, 25, 23, 35),
+    ]
+    coverage_l = [
+        E("cov-title", 1, 25, 1, 3),
+        Cont("covp-1", 1, 7, 3, 9, [L("cov-k1", 1, 25, 1, 2)]),
+        Cont("covp-2", 7, 13, 3, 9, [L("cov-k2", 1, 25, 1, 2)]),
+        Cont("covp-3", 13, 19, 3, 9, [L("cov-k3", 1, 25, 1, 2)]),
+        Cont("covp-4", 19, 25, 3, 9, [L("cov-k4", 1, 25, 1, 2)]),
+        E("cov-seg-h", 1, 25, 9, 11),
+        Cont("cov-sc", 1, 7, 11, 16, [L("cov-sc-b", 1, 25, 1, 2)]),
+        Cont("cov-sm", 7, 13, 11, 16, [L("cov-sm-b", 1, 25, 1, 2)]),
+        Cont("cov-se", 13, 19, 11, 16, [L("cov-se-b", 1, 25, 1, 2)]),
+        Cont("cov-st", 19, 25, 11, 16, [L("cov-st-b", 1, 25, 1, 2)]),
+        E("cov-note", 1, 25, 16, 18),
+    ]
+    abm_l = [
+        E("abm-title", 1, 25, 1, 3),
+        Cont("abm-1", 1, 9, 3, 9, [L("abm-k1", 1, 25, 1, 2)]),
+        Cont("abm-2", 9, 17, 3, 9, [L("abm-k2", 1, 25, 1, 2)]),
+        Cont("abm-3", 17, 25, 3, 9, [L("abm-k3", 1, 25, 1, 2)]),
+        E("abm-note", 1, 25, 9, 12),
     ]
     data_l = [E("data-note", 1, 25, 1, 6)]
     row = 6
@@ -895,6 +1018,7 @@ No daily snapshot grain — Movement uses pack bridge.
         '<?xml version="1.0" encoding="utf-8"?>',
         page("page-rotb", rotb), page("page-total", total_l), page("page-sourcing", sourcing_l),
         page("page-open", open_l), page("page-movement", movement_l), page("page-created", created_l),
+        page("page-abm", abm_l), page("page-coverage", coverage_l),
         page("page-data", data_l),
     ])
     seen = {e["id"]: e for e in els}
@@ -929,6 +1053,8 @@ No daily snapshot grain — Movement uses pack bridge.
                 {"id": "page-open", "name": "Open Pipeline", "backgroundColor": "#f8fafc"},
                 {"id": "page-movement", "name": "Pipeline Movement", "backgroundColor": "#f8fafc"},
                 {"id": "page-created", "name": "Pipeline Created", "backgroundColor": "#f8fafc"},
+                {"id": "page-abm", "name": "Q4 Big Bet ABM Plays", "backgroundColor": "#f8fafc"},
+                {"id": "page-coverage", "name": "Pipeline Coverage", "backgroundColor": "#f8fafc"},
                 {"id": "page-data", "name": "Data", "visibility": "hidden"},
             ],
             "elements": elements, "layout": layout,
