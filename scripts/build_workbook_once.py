@@ -337,7 +337,7 @@ def build():
 
     # ═══════════════ TOTAL ═══════════════
     els += [
-        T("total-title", f'# Total Company\n<p class="p-small"><span style="color:{MUTED}">All pipeline sources · 2H target vs actual by segment &amp; product</span></p>'),
+        T("total-title", f'# Total Company\n<p class="p-small"><span style="color:{MUTED}">ACV-fast · product actuals + segment 2H targets (segment actuals on Sourcing)</span></p>'),
         C("tc-1"), C("tc-2"), C("tc-3"),
         T("tk-cq",
           label("PIPELINE TO CLOSE IN CURRENT QUARTER") + "\n" +
@@ -405,7 +405,7 @@ def build():
           hero(ref(Z, "LOST_ACV", "$,.0f"), RED, 32) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">{ref(Z,"LOST_OPPS",",.0f")} opps · ≤ $50k</span></p>'),
         T("mk-created", label("CREATED Q4") + "\n" + hero(ref(P, "Q4_CREATED_ACV", "$,.0f"), ORANGE, 32)),
-        T("mv-trend-h", f'## Daily open pipeline\n<span style="color:{MUTED}">Last 60 days · Stage 2+ forecasted net ACV</span>'),
+        T("mv-trend-h", f'## Daily open pipeline\n<span style="color:{MUTED}">Last 30 days · Stage 2+ forecasted net ACV</span>'),
         {
             "id": "chart-snap", "kind": "line-chart", "name": "Open Pipeline Snapshot Trend",
             "source": dm("chart-snap"),
