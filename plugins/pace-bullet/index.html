@@ -4,6 +4,9 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Goal pace bar</title>
+<!-- SDK UMD needs window.React at load and exports window.SigmaPlugin -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/@sigmacomputing/plugin@1.3.2/dist/umd/sigmacomputing-plugin.umd.js"></script>
 <style>
   html,body{margin:0;padding:0;height:100%;background:transparent;
     font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
@@ -21,30 +24,27 @@
     background:var(--tick,#334155);transition:left .35s ease}
   .foot{font-size:12px;color:#64748b}
   .foot b{font-weight:600;color:#334155}
+  .wait{font-size:13px;color:#64748b}
 </style>
 </head>
 <body>
 <div id="root"></div>
-<script src="https://unpkg.com/@sigmacomputing/plugin"></script>
 <script>
 (function () {
   "use strict";
   var root = document.getElementById("root");
 
-  // ---------- helpers ----------
   function esc(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
   function num(v) { var n = Number(v); return isFinite(n) ? n : null; }
   function clamp01(x) { return Math.max(0, Math.min(1, x)); }
-  // Auto-detect 0-1 vs 0-100. Values <= 1 are fractions; > 1 are percents.
   function toFrac(v) {
     v = num(v);
     if (v === null) return null;
     return Math.abs(v) <= 1 ? v : v / 100;
   }
   function sig(v, p) {
-    // d3-style ".Ns" with SI suffix (B instead of G)
     if (v === 0) return "0";
     var units = [[1e12, "T"], [1e9, "B"], [1e6, "M"], [1e3, "K"]];
     var a = Math.abs(v);
@@ -57,7 +57,6 @@
     return a >= Math.pow(10, p) ? String(Math.round(v)) : Number(v.toPrecision(p)).toString();
   }
   function group(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
-  // valueFormat hint: "$,.2s" (default), "$,.0f", ",.0f", "$.1s", ...
   function fmt(v, hint) {
     v = num(v); if (v === null) return "—";
     var m = /^\s*(\$)?(,)?\.?(\d)?([sf])\s*$/.exec(hint || "") || /^\s*(\$)?(,)?\.(\d)([sf])\s*$/.exec("$,.2s");
@@ -71,11 +70,26 @@
     }
     return body.charAt(0) === "-" ? "-" + dollar + body.slice(1) : dollar + body;
   }
-  function pctStr(f) { return (f * 100).toFixed(f * 100 >= 100 || f === 0 ? 0 : 0) + "%"; }
   function colorOk(c) { return typeof c === "string" && /^#?[0-9a-fA-F]{3,8}$|^[a-z]+$|^rgba?\(/.test(c.trim()); }
   function normColor(c, d) {
     if (!colorOk(c)) return d; c = c.trim();
     return /^[0-9a-fA-F]{3,8}$/.test(c) ? "#" + c : c;
+  }
+  function sourceId(src) {
+    if (!src) return null;
+    if (typeof src === "string") return src;
+    if (typeof src === "object") return src.elementId || src.id || src.nodeId || null;
+    return null;
+  }
+  function colKey(cfgVal) {
+    if (cfgVal == null || cfgVal === "") return null;
+    if (typeof cfgVal === "string" || typeof cfgVal === "number") return String(cfgVal);
+    if (Object.prototype.toString.call(cfgVal) === "[object Array]") return colKey(cfgVal[0]);
+    if (typeof cfgVal === "object") {
+      if (cfgVal.columnId != null) return String(cfgVal.columnId);
+      if (cfgVal.id != null) return String(cfgVal.id);
+    }
+    return null;
   }
 
   function draw(d) {
@@ -101,66 +115,78 @@
     root.innerHTML = h;
   }
 
-  // Demo data so the editor never looks broken before a source is bound.
+  function waiting(msg) {
+    root.innerHTML = '<div class="wait">' + esc(msg || "Waiting for workbook data…") + '</div>';
+  }
+
   function synth() {
-    return { title: "Closed Won ROTB", actual: 1840000, goal: 3000000, paced: 0.72,
+    return { title: "Year Pipeline Created", actual: 1840000, goal: 3000000, paced: 0.72,
              valueFormat: "$,.2s", fillColor: null, tickColor: null };
   }
 
-  var LAST = synth();
-  var client = window.sigmaComputing && window.sigmaComputing.plugin
-             ? window.sigmaComputing.plugin.client : null;
+  function getClient() {
+    return (window.SigmaPlugin && window.SigmaPlugin.client)
+      || (window.sigma && window.sigma.plugin && window.sigma.plugin.client)
+      || (window.sigmaComputing && window.sigmaComputing.plugin && window.sigmaComputing.plugin.client)
+      || null;
+  }
 
-  if (!client) { draw(LAST); }
-  else {
+  var LAST = null, CFG = null, DATA = null, unsub = null;
+
+  function render() {
+    if (!CFG || !sourceId(CFG.source)) {
+      if (!LAST) draw(synth());
+      else draw(LAST);
+      return;
+    }
+    var aKey = colKey(CFG.actual), gKey = colKey(CFG.goal);
+    if (!DATA || !aKey || !gKey || !DATA[aKey] || !DATA[gKey] || !DATA[aKey].length) {
+      waiting(CFG.title ? CFG.title + " · loading…" : "Waiting for workbook data…");
+      return;
+    }
+    function first(key) {
+      var col = colKey(CFG[key]);
+      if (!col || !DATA[col] || !DATA[col].length) return null;
+      return DATA[col][0];
+    }
+    var paced = toFrac(first("pacedPct"));
+    if (paced === null) paced = toFrac(first("elapsedPct"));
+    LAST = { title: CFG.title, actual: num(first("actual")), goal: num(first("goal")), paced: paced,
+             valueFormat: CFG.valueFormat || "$,.2s", fillColor: CFG.fillColor, tickColor: CFG.tickColor };
+    draw(LAST);
+  }
+
+  function wire(client) {
     client.config.configureEditorPanel([
       { name: "source", type: "element" },
       { name: "actual", type: "column", source: "source", allowedTypes: ["number"], label: "Actual (number)" },
       { name: "goal", type: "column", source: "source", allowedTypes: ["number"], label: "Goal (number)" },
       { name: "pacedPct", type: "column", source: "source", allowedTypes: ["number"], label: "Paced % (0-1 or 0-100)" },
-      { name: "elapsedPct", type: "column", source: "source", allowedTypes: ["number"], label: "Elapsed % (optional, fallback for paced)" },
-      { name: "title", type: "text", label: "Title (optional)", placeholder: "e.g. Closed Won ROTB" },
-      { name: "valueFormat", type: "text", label: "Value format hint", placeholder: "$,.2s  or  $,.0f", defaultValue: "$,.2s" },
+      { name: "elapsedPct", type: "column", source: "source", allowedTypes: ["number"], label: "Elapsed % (optional)" },
+      { name: "title", type: "text", label: "Title (optional)", placeholder: "e.g. Year Pipeline Created" },
+      { name: "valueFormat", type: "text", label: "Value format hint", placeholder: "$,.2s", defaultValue: "$,.2s" },
       { name: "fillColor", type: "text", label: "Fill color (optional)", placeholder: "#f97316" },
       { name: "tickColor", type: "text", label: "Tick color (optional)", placeholder: "#334155" }
     ]);
-
-    var unsub = null, CFG = null, DATA = null;
-
-    function render() {
-      if (!CFG || !CFG.source || !DATA || !CFG.actual || !CFG.goal || !DATA[CFG.actual] || !DATA[CFG.goal]) {
-        var s = synth();
-        if (CFG) {
-          if (CFG.title) s.title = CFG.title;
-          if (CFG.valueFormat) s.valueFormat = CFG.valueFormat;
-          s.fillColor = CFG.fillColor; s.tickColor = CFG.tickColor;
-        }
-        draw(s); return;
-      }
-      function first(key) {
-        var col = CFG[key];
-        if (!col || !DATA[col] || !DATA[col].length) return null;
-        return DATA[col][0];
-      }
-      var paced = toFrac(first("pacedPct"));
-      if (paced === null) paced = toFrac(first("elapsedPct"));
-      LAST = { title: CFG.title, actual: num(first("actual")), goal: num(first("goal")), paced: paced,
-               valueFormat: CFG.valueFormat, fillColor: CFG.fillColor, tickColor: CFG.tickColor };
-      draw(LAST);
-    }
-
     client.config.subscribe(function (cfg) {
       if (unsub) { unsub(); unsub = null; }
       CFG = cfg || null; DATA = null;
-      if (!CFG || !CFG.source) { render(); return; }
+      var sid = CFG && sourceId(CFG.source);
+      if (!sid) { render(); return; }
       unsub = client.elements.subscribeToElementData(CFG.source, function (data) {
-        DATA = data; render();
+        DATA = data || null; render();
       });
       render();
     });
   }
 
-  if (!client) draw(LAST);
+  var tries = 0;
+  (function boot() {
+    var client = getClient();
+    if (client) { wire(client); return; }
+    if (++tries < 40) { setTimeout(boot, 50); return; }
+    draw(synth());
+  })();
 })();
 </script>
 </body>
