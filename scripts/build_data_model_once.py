@@ -147,6 +147,8 @@ WITH base AS (
   WHERE NOT "Is Closed"
     AND LEFT("Stage Name", 1) IN ('2', '3', '4', '5', '6', '7')
     AND FCST_NETACV BETWEEN 0 AND 5000000
+    -- Bound close window (matches pack horizons) so VW scan stays smaller.
+    AND "Close Date" >= '2026-10-01' AND "Close Date" < '2027-07-01'
 ),
 tagged AS (
   SELECT
