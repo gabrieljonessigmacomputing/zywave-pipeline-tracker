@@ -289,7 +289,7 @@ def build():
         els.append(C(cid))
     els.append(C("okc-w", "#eff6ff", "#93c5fd"))  # walk-in blue chrome (still)
     els += [
-        T("open-title", f'# Open Pipeline\n<p class="p-small"><span style="color:{MUTED}">FY2026 Stage 2+ Pipeline by Close Date</span></p>'),
+        T("open-title", f'# Open Pipeline\n<p class="p-small"><span style="color:{MUTED}">FY2026 Stage 2+ by close date · ACV-fast (filters are chrome-only)</span></p>'),
         T("open-live", f'<p class="p-small" style="text-align:right"><span style="color:{GREEN}">Live from Snowflake</span></p>'),
         T("ok-u", label("UNIQUE OPPORTUNITIES") + "\n" + hero(ref(P, "TOTAL_OPPS", ",.0f"), INK, 28)),
         T("ok-t", label("TOTAL PIPELINE ACV") + "\n" + hero(ref(P, "TOTAL_ACV", "$,.2s"), INK, 28)),
