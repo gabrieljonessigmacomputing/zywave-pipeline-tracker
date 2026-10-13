@@ -781,8 +781,8 @@ def build():
             "id": "chart-created", "kind": "bar-chart", "name": "Pipeline Created YoY by Quarter",
             "source": dm("chart-created"),
             "columns": [
-                {"id": "ccm-q", "name": "Quarter", "formula": "[Chart Created/QUARTER]"},
                 {"id": "ccm-ord", "name": "Ord", "formula": "[Chart Created/ORD]"},
+                {"id": "ccm-q", "name": "Quarter", "formula": "[Chart Created/QUARTER]"},
                 {"id": "ccm-fy25", "name": "FY2025", "formula": "[Chart Created/FY2025]",
                  "format": {"kind": "number", "formatString": "$,.2s"}},
                 {"id": "ccm-fy26", "name": "FY2026", "formula": "[Chart Created/FY2026]",
