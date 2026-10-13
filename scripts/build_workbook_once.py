@@ -254,12 +254,20 @@ def build():
         T("rk-cq", label("CLOSING THIS QUARTER") + "\n" + hero(ref(P, "Q4_ACV", "$,.2s"), BLUE, 32)),
         T("rk-nq", label("CLOSING NEXT QUARTER") + "\n" + hero(ref(P, "NQ_ACV", "$,.2s"), BLUE, 32)),
         T("rk-2q", label("CLOSING TWO QUARTERS OUT") + "\n" + hero(ref(P, "Q2OUT_ACV", "$,.2s"), BLUE, 32)),
-        T("rotb-s03", f'## <span style="color:{MUTED}">03 / PIPELINE MANAGEMENT</span>\nQ4 walk-in (closed won/lost on Movement)'),
-        C("mgmt-w"),
+        T("rotb-s03", f'## <span style="color:{MUTED}">03 / PIPELINE MANAGEMENT</span>\nQ4 walk-in + closed (ACV pack · same grain as Movement)'),
+        C("mgmt-w"), C("mgmt-won", GREEN_BG, "#bbf7d0"), C("mgmt-lost", RED_BG, "#fecaca"),
         T("rk-walk",
           label("WALK-IN (Q4 START)") + "\n" +
           hero(ref(W, "WALKIN_ACV", "$,.2s"), BLUE, 28) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">Frozen · {ref(W,"WALKIN_OPPS",",.0f")} opps · closed detail on Movement</span></p>'),
+          f'<p class="p-small"><span style="color:{MUTED}">Frozen · {ref(W,"WALKIN_OPPS",",.0f")} opps</span></p>'),
+        T("rk-won",
+          label("CLOSED WON (Q4)") + "\n" +
+          hero(ref(P, "WON_ACV", "$,.2s"), GREEN, 28) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"WON_OPPS",",.0f")} opps · pack</span></p>'),
+        T("rk-lost",
+          label("CLOSED LOST (Q4)") + "\n" +
+          hero(ref(P, "LOST_ACV", "$,.2s"), RED, 28) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"LOST_OPPS",",.0f")} opps · ≤ $50k</span></p>'),
         T("rotb-s04", f'## <span style="color:{BLUE}">04 / EARLY STAGE PIPELINE</span>\nOpen Stage 0–2 · Snowflake SoT'),
         C("dm-s0"), C("dm-s1"), C("dm-s2", TEAL_BG, "#5eead4"), C("dm-mo"),
         T("dm-s0-b",
@@ -526,11 +534,13 @@ No daily snapshot grain — Movement uses pack bridge.
             Cont("cov-3", 13, 19, 2, 6, [L("rk-nq", 1, 25, 1, 8)], 2),
             Cont("cov-4", 19, 25, 2, 6, [L("rk-2q", 1, 25, 1, 8)], 2),
         ]),
-        Cont("sec-03", 1, 25, 18, 23, [
+        Cont("sec-03", 1, 25, 18, 25, [
             L("rotb-s03", 1, 25, 1, 2),
-            Cont("mgmt-w", 1, 25, 2, 6, [L("rk-walk", 1, 25, 1, 8)], 2),
+            Cont("mgmt-w", 1, 9, 2, 8, [L("rk-walk", 1, 25, 1, 8)], 2),
+            Cont("mgmt-won", 9, 17, 2, 8, [L("rk-won", 1, 25, 1, 8)], 2),
+            Cont("mgmt-lost", 17, 25, 2, 8, [L("rk-lost", 1, 25, 1, 8)], 2),
         ]),
-        Cont("sec-04", 1, 25, 23, 28, [
+        Cont("sec-04", 1, 25, 25, 32, [
             L("rotb-s04", 1, 25, 1, 2),
             Cont("dm-s0", 1, 7, 2, 6, [L("dm-s0-b", 1, 25, 1, 8)], 2),
             Cont("dm-s1", 7, 13, 2, 6, [L("dm-s1-b", 1, 25, 1, 8)], 2),
