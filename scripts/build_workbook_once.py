@@ -115,6 +115,7 @@ def build():
         ("MONTH_ACV", m()), ("MONTH_OPPS", None),
         ("WEEK_ACV", m()), ("WEEK_OPPS", None),
         ("CREATED_CLOSING_ACV", m()), ("CREATED_CLOSING_OPPS", None),
+        ("WON_ACV", m()), ("WON_OPPS", None), ("LOST_ACV", m()), ("LOST_OPPS", None),
         ("YEAR_GOAL", m()), ("Q4_GOAL", m()),
         ("YEAR_ELAPSED", p()), ("Q4_ELAPSED", p()),
         ("YEAR_PCT_GOAL", p()), ("Q4_PCT_GOAL", p()),
@@ -124,16 +125,12 @@ def build():
         pass_tbl("wb-pack", "WB Pack", "kpi-pack", "KPI Pack", pack_cols),
         pass_tbl("wb-walkin", "WB Walkin", "kpi-walkin", "KPI Walkin",
                  [("WALKIN_OPPS", None), ("WALKIN_ACV", m())]),
-        # Closed Q4 only (date-selective) — safe for ROTB.
-        pass_tbl("wb-closed", "WB Closed", "kpi-closed", "KPI Closed Q4", [
-            ("WON_ACV", m()), ("WON_OPPS", None), ("LOST_ACV", m()), ("LOST_OPPS", None),
-        ]),
         # Early stages (ACV) — never waits on VW.
         pass_tbl("wb-open", "WB Open", "kpi-open", "KPI Open", [
             ("S0_OPPS", None), ("S0_ACV", m()), ("S1_OPPS", None), ("S1_ACV", m()),
             ("S2_OPPS", None), ("S2_ACV", m()),
         ]),
-        # Open-VW sourcing — Sourcing + Total pages only (NOT on ROTB).
+        # Open-VW sourcing — Sourcing only (NOT on ROTB/Open/Total/Created/Movement).
         pass_tbl("wb-src", "WB Sourcing", "kpi-src", "KPI Sourcing", [
             ("MKT_ACV", m()), ("SALES_ACV", m()), ("SRC_TOTAL_ACV", m()),
             ("MKT_MIX", p()), ("SALES_MIX", p()),
@@ -142,20 +139,20 @@ def build():
         ]),
         pass_tbl("wb-funnel", "WB Funnel", "chart-funnel", "Chart Funnel",
                  [("STAGE", None), ("ORD", None), ("ACV", m())]),
-        # ACV-only TV grain (fast). SEG Actual from wb-src in the plugin.
+        # ACV-only TV grain (fast).
         pass_tbl("wb-tv", "WB TV", "chart-tv", "Chart Target Actual Source",
                  [("GRAIN", None), ("DIM", None), ("SERIES", None), ("VAL", m()), ("OPPS", None)]),
     ]
 
     # Column ids on wb-pack (must match pack_cols order above)
     PACK_YTD, PACK_Q4C = "wb-pack-12", "wb-pack-13"
-    PACK_YG, PACK_Q4G = "wb-pack-21", "wb-pack-22"
-    PACK_YEL, PACK_Q4EL = "wb-pack-23", "wb-pack-24"
+    PACK_YG, PACK_Q4G = "wb-pack-25", "wb-pack-26"
+    PACK_YEL, PACK_Q4EL = "wb-pack-27", "wb-pack-28"
 
     plug = load_plugin_ids()
     PACE_ID, FUNNEL_ID, TV_ID = plug["pace"], plug["funnel"], plug["tv"]
     P, W = "WB Pack", "WB Walkin"
-    Z, O, S = "WB Closed", "WB Open", "WB Sourcing"
+    O, S = "WB Open", "WB Sourcing"
 
     def ref(table, col, fmt):
         return "{{" + f"[{table}/{col}] | {fmt}" + "}}"
@@ -419,12 +416,12 @@ def build():
         T("mk-walk", label("WALK-IN (Q4 START)") + "\n" + hero(ref(W, "WALKIN_ACV", "$,.0f"), TEAL, 32)),
         T("mk-won",
           label("CLOSED WON (Q4)") + "\n" +
-          hero(ref(Z, "WON_ACV", "$,.0f"), GREEN, 32) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">{ref(Z,"WON_OPPS",",.0f")} opps</span></p>'),
+          hero(ref(P, "WON_ACV", "$,.0f"), GREEN, 32) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"WON_OPPS",",.0f")} opps</span></p>'),
         T("mk-lost",
           label("CLOSED LOST (Q4)") + "\n" +
-          hero(ref(Z, "LOST_ACV", "$,.0f"), RED, 32) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">{ref(Z,"LOST_OPPS",",.0f")} opps · ≤ $50k</span></p>'),
+          hero(ref(P, "LOST_ACV", "$,.0f"), RED, 32) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"LOST_OPPS",",.0f")} opps · ≤ $50k</span></p>'),
         T("mk-created", label("CREATED Q4") + "\n" + hero(ref(P, "Q4_CREATED_ACV", "$,.0f"), ORANGE, 32)),
         T("mv-trend-h", f'## Daily open pipeline\n<span style="color:{MUTED}">Last 14 days · Stage 2+ forecasted net ACV</span>'),
         {
@@ -618,7 +615,7 @@ Movement trend = 14-day snapshot VW. TV = ACV product; segment targets on Total.
     ]
     data_l = [E("data-note", 1, 25, 1, 6)]
     row = 6
-    for wid in ["wb-pack", "wb-walkin", "wb-closed", "wb-open", "wb-src", "wb-funnel", "wb-tv"]:
+    for wid in ["wb-pack", "wb-walkin", "wb-open", "wb-src", "wb-funnel", "wb-tv"]:
         data_l.append(E(wid, 1, 25, row, row + 3))
         row += 3
 

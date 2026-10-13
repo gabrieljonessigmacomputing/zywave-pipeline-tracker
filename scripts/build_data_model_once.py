@@ -97,8 +97,19 @@ created AS (
   FROM BI_STAGING.DATA.OPPORTUNITY_ACV_METRICS
   WHERE METRIC_NAME = 'Forecasted Net ACV' AND STAGE_2_ATTAINED = TRUE
     AND STAGE_2_DATETIME >= '2025-10-01'
+),
+closed AS (
+  SELECT
+    COALESCE(SUM(IFF(STAGE_GROUP = 'Won' AND METRIC_VALUE BETWEEN 0 AND 5000000, METRIC_VALUE, 0)), 0) AS WON_ACV,
+    COUNT(DISTINCT IFF(STAGE_GROUP = 'Won' AND METRIC_VALUE BETWEEN 0 AND 5000000, OPPORTUNITY_ID, NULL)) AS WON_OPPS,
+    COALESCE(SUM(IFF(STAGE_GROUP = 'Lost' AND METRIC_VALUE BETWEEN 0 AND 50000, METRIC_VALUE, 0)), 0) AS LOST_ACV,
+    COUNT(DISTINCT IFF(STAGE_GROUP = 'Lost' AND METRIC_VALUE BETWEEN 0 AND 50000, OPPORTUNITY_ID, NULL)) AS LOST_OPPS
+  FROM BI_STAGING.DATA.OPPORTUNITY_ACV_METRICS
+  WHERE METRIC_NAME = 'Forecasted Net ACV'
+    AND STAGE_GROUP IN ('Won', 'Lost')
+    AND CLOSE_DATE >= '2026-10-01' AND CLOSE_DATE < '2027-01-01'
 )
-SELECT o.*, c.*,
+SELECT o.*, c.*, z.*,
   {YEAR_GOAL}::FLOAT AS YEAR_GOAL, {Q4_GOAL}::FLOAT AS Q4_GOAL,
   LEAST(1, DATEDIFF(day,'2026-01-01',CURRENT_DATE())/365.0) AS YEAR_ELAPSED,
   LEAST(1, GREATEST(0, DATEDIFF(day,'2026-10-01',CURRENT_DATE())/92.0)) AS Q4_ELAPSED,
@@ -107,7 +118,7 @@ SELECT o.*, c.*,
   IFF(o.TOTAL_ACV>0, o.CLOSE_CY_ACV/o.TOTAL_ACV, 0) AS CLOSE_CY_PCT,
   IFF(o.TOTAL_ACV>0, o.CLOSE_NY_ACV/o.TOTAL_ACV, 0) AS CLOSE_NY_PCT,
   IFF(o.TOTAL_ACV>0, o.CLOSE_FY_ACV/o.TOTAL_ACV, 0) AS CLOSE_FY_PCT
-FROM open_acv o CROSS JOIN created c
+FROM open_acv o CROSS JOIN created c CROSS JOIN closed z
 """
 
     # 2) Walk-in — tiny snapshot (date-partitioned)
@@ -121,20 +132,7 @@ SELECT COUNT(*) AS WALKIN_OPPS, COALESCE(SUM(v),0) AS WALKIN_ACV FROM (
   GROUP BY 1 HAVING MAX(FCST_NETACV) BETWEEN 0 AND 2000000
 )"""
 
-    # 3a) Closed Q4 — ACV metrics STAGE_GROUP (fast). Never touch presentation VW.
-    closed = """
-SELECT
-  COALESCE(SUM(IFF(STAGE_GROUP = 'Won' AND METRIC_VALUE BETWEEN 0 AND 5000000, METRIC_VALUE, 0)), 0) AS WON_ACV,
-  COUNT(DISTINCT IFF(STAGE_GROUP = 'Won' AND METRIC_VALUE BETWEEN 0 AND 5000000, OPPORTUNITY_ID, NULL)) AS WON_OPPS,
-  COALESCE(SUM(IFF(STAGE_GROUP = 'Lost' AND METRIC_VALUE BETWEEN 0 AND 50000, METRIC_VALUE, 0)), 0) AS LOST_ACV,
-  COUNT(DISTINCT IFF(STAGE_GROUP = 'Lost' AND METRIC_VALUE BETWEEN 0 AND 50000, OPPORTUNITY_ID, NULL)) AS LOST_OPPS
-FROM BI_STAGING.DATA.OPPORTUNITY_ACV_METRICS
-WHERE METRIC_NAME = 'Forecasted Net ACV'
-  AND STAGE_GROUP IN ('Won', 'Lost')
-  AND CLOSE_DATE >= '2026-10-01' AND CLOSE_DATE < '2027-01-01'
-"""
-
-    # 3b) Open sourcing + SEG — Sourcing page only (never bind on ROTB/Open/Total/Created).
+    # 3) Open sourcing + SEG — Sourcing page only (never bind on ROTB/Open/Total/Created).
     # Column-prune then agg. Segment labels often include prefixes (e.g. "1 - Core").
     src_kpi = """
 WITH base AS (
@@ -264,6 +262,7 @@ SELECT 'PROD', a.DIM, 'Actual', a.ACTUAL, NULL FROM prod_act a
         ("MONTH_ACV", m()), ("MONTH_OPPS", None),
         ("WEEK_ACV", m()), ("WEEK_OPPS", None),
         ("CREATED_CLOSING_ACV", m()), ("CREATED_CLOSING_OPPS", None),
+        ("WON_ACV", m()), ("WON_OPPS", None), ("LOST_ACV", m()), ("LOST_OPPS", None),
         ("YEAR_GOAL", m()), ("Q4_GOAL", m()),
         ("YEAR_ELAPSED", p()), ("Q4_ELAPSED", p()),
         ("YEAR_PCT_GOAL", p()), ("Q4_PCT_GOAL", p()),
@@ -283,9 +282,6 @@ GROUP BY 1
         ("S0_OPPS", None), ("S0_ACV", m()), ("S1_OPPS", None), ("S1_ACV", m()),
         ("S2_OPPS", None), ("S2_ACV", m()),
     ]
-    closed_cols = [
-        ("WON_ACV", m()), ("WON_OPPS", None), ("LOST_ACV", m()), ("LOST_OPPS", None),
-    ]
     src_kpi_cols = [
         ("MKT_ACV", m()), ("SALES_ACV", m()), ("SRC_TOTAL_ACV", m()),
         ("MKT_MIX", p()), ("SALES_MIX", p()),
@@ -295,9 +291,8 @@ GROUP BY 1
     return [
         sql_table("kpi-pack", "KPI Pack", pack, pack_cols),
         sql_table("kpi-walkin", "KPI Walkin", walkin, [("WALKIN_OPPS", None), ("WALKIN_ACV", m())]),
-        sql_table("kpi-closed", "KPI Closed Q4", closed, closed_cols),
         sql_table("kpi-open", "KPI Open", open_kpi, open_kpi_cols),
-        # Open-VW only for Sourcing + Total (not ROTB)
+        # Open-VW only for Sourcing (not ROTB/Open/Total/Created/Movement KPIs)
         sql_table("kpi-src", "KPI Sourcing", src_kpi, src_kpi_cols),
         sql_table("chart-tv", "Chart Target Actual Source", charts, [
             ("GRAIN", None), ("DIM", None), ("SERIES", None), ("VAL", m()), ("OPPS", None)]),
