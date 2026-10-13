@@ -28,7 +28,7 @@ PLUGINS = [
         "key": "tv",
         "name": "Pipeline Tracker · Target vs Actual dual",
         "description": "Segment + product Target vs Actual from one chart-tv grain (single warehouse job).",
-        "url": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/tv-dual-v3/",
+        "url": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/tv-dual-v4/",
         "devUrl": "http://localhost:5173",
     },
     {

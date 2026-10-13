@@ -194,7 +194,7 @@ def build():
         }
 
     def open_kpi_plugin(eid, mode, src_eid="wb-tv"):
-        # Reuse approved TV plugin + layout mode (new plugin ids often never get element data).
+        # Same approved TV plugin; mode via title (text config) — avoids unknown config keys.
         return {
             "id": eid, "kind": "plugin", "pluginId": TV_ID, "displayName": f"Open KPIs ({mode})",
             "config": {
@@ -204,7 +204,7 @@ def build():
                 "series": {"kind": "column", "columnId": f"{src_eid}-2", "source": "source"},
                 "val": {"kind": "column", "columnId": f"{src_eid}-3", "source": "source"},
                 "opps": {"kind": "column", "columnId": f"{src_eid}-4", "source": "source"},
-                "layout": mode,
+                "title": mode,
             },
             "style": {"backgroundColor": WHITE},
         }
