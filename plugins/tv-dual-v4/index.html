@@ -323,9 +323,10 @@
     var seg = groupRows(LAST, "SEG");
     var prod = groupRows(LAST, "PROD");
     var src = groupRows(LAST, "SRC");
+    // Lead-source mix lives on ROTB / Sourcing as text heroes (wb-src) — keep TV focused on charts.
     root.innerHTML =
       '<div class="charts"><div class="panel" id="p-seg"></div><div class="panel" id="p-prod"></div></div>' +
-      attainmentHtml(seg) + srcHtml(src, LAST);
+      attainmentHtml(seg);
     drawPanel(document.getElementById("p-seg"), "Pipeline by Segment: 2H Target vs Actual", seg);
     drawPanel(document.getElementById("p-prod"), "Pipeline by Product Group: 2H Target vs Actual", prod);
   }
@@ -416,3 +417,5 @@
 </html>
 
 <!-- build 20261013183536 -->
+
+<!-- build 20261013183748 nosrc -->
