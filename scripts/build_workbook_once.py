@@ -152,7 +152,7 @@ def build():
             ("CORE_PCT_GOAL", p()), ("MID_PCT_GOAL", p()), ("ENT_PCT_GOAL", p()),
         ]),
         pass_tbl("wb-funnel", "WB Funnel", "chart-funnel", "Chart Funnel",
-                 [("STAGE", None), ("ORD", None), ("ACV", m())]),
+                 [("STAGE", None), ("ORD", None), ("ACV", m()), ("OPPS", None)]),
         # ACV-only TV grain (fast).
         pass_tbl("wb-tv", "WB TV", "chart-tv", "Chart Target Actual Source",
                  [("GRAIN", None), ("DIM", None), ("SERIES", None), ("VAL", m()), ("OPPS", None)]),
@@ -466,7 +466,7 @@ def build():
             "source": dm("chart-funnel"),
             "columns": [
                 {"id": "tss-s", "name": "Stage", "formula": "[Chart Funnel/STAGE]"},
-                {"id": "tss-o", "name": "Ord", "formula": "[Chart Funnel/ORD]"},
+                {"id": "tss-d", "name": "Deals", "formula": "[Chart Funnel/OPPS]"},
                 {"id": "tss-a", "name": "ACV", "formula": "[Chart Funnel/ACV]", "format": m()},
             ],
             "style": {"backgroundColor": WHITE, "borderRadius": "round", "borderColor": BORDER, "borderWidth": 1},
@@ -783,6 +783,16 @@ def build():
             },
             "style": {"backgroundColor": WHITE, "borderRadius": "round", "borderColor": BORDER, "borderWidth": 1},
         },
+        {
+            "id": "tbl-yoy", "kind": "table", "name": "Created YoY by Quarter",
+            "source": dm("chart-created"),
+            "columns": [
+                {"id": "ty-q", "name": "Quarter", "formula": "[Chart Created/QUARTER]"},
+                {"id": "ty-fy", "name": "FY", "formula": "[Chart Created/FY]"},
+                {"id": "ty-a", "name": "ACV", "formula": "[Chart Created/ACV]", "format": m()},
+            ],
+            "style": {"backgroundColor": WHITE, "borderRadius": "round", "borderColor": BORDER, "borderWidth": 1},
+        },
         T("data-note", """# Fast path
 
 Hot pages = ACV pack (open/created/won/lost/early/size/bridge residual/coverage) + walk-in + funnel/TV
@@ -854,6 +864,27 @@ Coverage / ABM = pack chrome (no open-VW). No daily snapshot grain.
         T("abm-note",
           f'<p class="p-small"><span style="color:{MUTED}">Stills ABM list is a frozen Salesforce baseline. '
           f'When the ABM opportunity table lands in Snowflake, bind it here — never fan open-VW into hot pages.</span></p>'),
+    ]
+
+    # ═══════════════ BI Top 100 (stills nav) — chrome pointer ═══════════════
+    els += [
+        T("bi100-title", f'# BI Top 100\n<p class="p-small"><span style="color:{MUTED}">Strategic account watchlist · ACV-fast context only</span></p>'),
+        C("bi100-1", TEAL_BG, "#99f6e4"), C("bi100-2"), C("bi100-3", AMBER_BG, "#fbbf24"),
+        T("bi100-k1",
+          label("TOTAL OPEN (CONTEXT)") + "\n" +
+          hero(ref(P, "TOTAL_ACV", "$,.2s"), TEAL, 28) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"TOTAL_OPPS",",.0f")} Stage 2+ opps</span></p>'),
+        T("bi100-k2",
+          label("LARGE DEALS (≥ $50k)") + "\n" +
+          hero(ref(P, "LARGE_OPPS", ",.0f"), "#7c3aed", 28) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"LARGE_ACV","$,.2s")} ACV</span></p>'),
+        T("bi100-k3",
+          label("LIST STATUS") + "\n" +
+          hero("Pending", ORANGE, 28) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">Top-100 account feed not in pack</span></p>'),
+        T("bi100-note",
+          f'<p class="p-small"><span style="color:{MUTED}">Stills BI Top 100 is an account-level list. Bind when the Top-100 table is in Snowflake — '
+          f'keep this page off open-VW.</span></p>'),
     ]
 
     def L(e, a, b, c, d):
@@ -1035,7 +1066,8 @@ Coverage / ABM = pack chrome (no open-VW). No daily snapshot grain.
         Cont("cc-ny", 9, 17, 17, 21, [L("ck-ny", 1, 25, 1, 2)]),
         Cont("cc-fy", 17, 25, 17, 21, [L("ck-fy", 1, 25, 1, 2)]),
         E("yoy-h", 1, 25, 21, 23),
-        E("chart-created", 1, 25, 23, 35),
+        E("chart-created", 1, 25, 23, 34),
+        E("tbl-yoy", 1, 25, 34, 42),
     ]
     coverage_l = [
         E("cov-title", 1, 25, 1, 3),
@@ -1057,6 +1089,13 @@ Coverage / ABM = pack chrome (no open-VW). No daily snapshot grain.
         Cont("abm-3", 17, 25, 3, 9, [L("abm-k3", 1, 25, 1, 2)]),
         E("abm-note", 1, 25, 9, 12),
     ]
+    bi100_l = [
+        E("bi100-title", 1, 25, 1, 3),
+        Cont("bi100-1", 1, 9, 3, 9, [L("bi100-k1", 1, 25, 1, 2)]),
+        Cont("bi100-2", 9, 17, 3, 9, [L("bi100-k2", 1, 25, 1, 2)]),
+        Cont("bi100-3", 17, 25, 3, 9, [L("bi100-k3", 1, 25, 1, 2)]),
+        E("bi100-note", 1, 25, 9, 12),
+    ]
     data_l = [E("data-note", 1, 25, 1, 6)]
     row = 6
     for wid in ["wb-pack", "wb-walkin", "wb-funnel", "wb-tv"]:
@@ -1067,7 +1106,7 @@ Coverage / ABM = pack chrome (no open-VW). No daily snapshot grain.
         '<?xml version="1.0" encoding="utf-8"?>',
         page("page-rotb", rotb), page("page-total", total_l), page("page-sourcing", sourcing_l),
         page("page-open", open_l), page("page-movement", movement_l), page("page-created", created_l),
-        page("page-abm", abm_l), page("page-coverage", coverage_l),
+        page("page-abm", abm_l), page("page-coverage", coverage_l), page("page-bi100", bi100_l),
         page("page-data", data_l),
     ])
     seen = {e["id"]: e for e in els}
@@ -1104,6 +1143,7 @@ Coverage / ABM = pack chrome (no open-VW). No daily snapshot grain.
                 {"id": "page-created", "name": "Pipeline Created", "backgroundColor": "#f8fafc"},
                 {"id": "page-abm", "name": "Q4 Big Bet ABM Plays", "backgroundColor": "#f8fafc"},
                 {"id": "page-coverage", "name": "Pipeline Coverage", "backgroundColor": "#f8fafc"},
+                {"id": "page-bi100", "name": "BI Top 100", "backgroundColor": "#f8fafc"},
                 {"id": "page-data", "name": "Data", "visibility": "hidden"},
             ],
             "elements": elements, "layout": layout,

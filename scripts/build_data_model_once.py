@@ -290,10 +290,12 @@ SELECT STAGE,
     WHEN '2 - Analysis' THEN 2 WHEN '3 - Executive Alignment' THEN 3
     WHEN '4 - Solution Validation' THEN 4 WHEN '5 - Negotiate' THEN 5
     WHEN '6 - Finance Hold' THEN 6 WHEN '7 - Finance Review' THEN 7 ELSE 99 END AS ORD,
-  COALESCE(SUM(METRIC_VALUE),0) AS ACV
+  COALESCE(SUM(METRIC_VALUE),0) AS ACV,
+  COUNT(DISTINCT OPPORTUNITY_ID) AS OPPS
 FROM BI_STAGING.DATA.OPPORTUNITY_ACV_METRICS
 WHERE METRIC_NAME='Forecasted Net ACV' AND STAGE_GROUP='2-7'
   AND CLOSE_DATE >= '2026-10-01' AND CLOSE_DATE < '2027-01-01'
+  AND METRIC_VALUE BETWEEN 0 AND 5000000
 GROUP BY 1,2
 """
 
@@ -416,7 +418,7 @@ SELECT 'PROD', a.DIM, 'Actual', a.ACTUAL, NULL FROM prod_act a
         sql_table("chart-tv", "Chart Target Actual Source", charts, [
             ("GRAIN", None), ("DIM", None), ("SERIES", None), ("VAL", m()), ("OPPS", None)]),
         sql_table("chart-funnel", "Chart Funnel", funnel, [
-            ("STAGE", None), ("ORD", None), ("ACV", m())]),
+            ("STAGE", None), ("ORD", None), ("ACV", m()), ("OPPS", None)]),
         sql_table("chart-created", "Chart Created", created_month, [
             ("QUARTER", None), ("ORD", None), ("FY", None), ("ACV", m())]),
         sql_table("chart-closemo", "Chart Close Month Stage", close_mo, [
