@@ -138,6 +138,7 @@ def build():
             ("MKT_ACV", m()), ("SALES_ACV", m()), ("SRC_TOTAL_ACV", m()),
             ("MKT_MIX", p()), ("SALES_MIX", p()),
             ("SEG_CORE", m()), ("SEG_MID", m()), ("SEG_ENT", m()),
+            ("SEG_UNMAPPED", m()), ("OPEN_ALL_ACV", m()),
         ]),
         pass_tbl("wb-funnel", "WB Funnel", "chart-funnel", "Chart Funnel",
                  [("STAGE", None), ("ORD", None), ("ACV", m())]),
@@ -383,21 +384,27 @@ def build():
           f'M {ref(S,"MKT_MIX",".0%")} / S {ref(S,"SALES_MIX",".0%")}</span></p>\n'
           f'<p class="p-small" style="text-align:center"><span style="color:{MUTED}">target M 39% / S 61%</span></p>'),
         C("sc-seg-row", SECTION, SECTION),
-        C("sc-core"), C("sc-mid"), C("sc-ent"),
+        C("sc-core"), C("sc-mid"), C("sc-ent"), C("sc-unmap", "#f8fafc", BORDER),
         T("sk-core",
-          label("CORE · OPEN ACV") + "\n" +
+          label("CORE · TAGGED") + "\n" +
           hero(ref(S, "SEG_CORE", "$,.2s"), BLUE, 28) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">2H target $18M</span></p>'),
+          f'<p class="p-small"><span style="color:{MUTED}">2H target $18M · pipe-token in SplitSegment</span></p>'),
         T("sk-mid",
-          label("MID-MARKET · OPEN ACV") + "\n" +
+          label("MID-MARKET · TAGGED") + "\n" +
           hero(ref(S, "SEG_MID", "$,.2s"), TEAL, 28) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">2H target $16M</span></p>'),
         T("sk-ent",
-          label("ENTERPRISE · OPEN ACV") + "\n" +
+          label("ENTERPRISE / UP-MARKET · TAGGED") + "\n" +
           hero(ref(S, "SEG_ENT", "$,.2s"), ORANGE, 28) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">2H target $20M</span></p>'),
+        T("sk-unmap",
+          label("UNTAGGED OPEN ACV") + "\n" +
+          hero(ref(S, "SEG_UNMAPPED", "$,.2s"), MUTED, 28) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">No Core/Mid/Enterprise token in Segment</span></p>'),
         T("sk-note",
-          f'<p class="p-small"><span style="color:{MUTED}">Open-VW 1-row agg · Lead Source + Segment · kept off ROTB/Open/Total/Created for speed · Q4 FY2026</span></p>'),
+          f'<p class="p-small"><span style="color:{MUTED}">Open-VW 1-row · Lead Source + SplitSegment market tokens · '
+          f'VW open {ref(S,"OPEN_ALL_ACV","$,.2s")} (pack {ref(P,"TOTAL_ACV","$,.2s")}) · '
+          f'kept off ROTB/Open/Total/Created · Q4 FY2026</span></p>'),
     ]
 
     # ═══════════════ MOVEMENT ═══════════════
@@ -572,9 +579,10 @@ TV = ACV product actuals; segment targets only on Total (segment actuals on Sour
             Cont("sc-mix-card", 19, 25, 1, 10, [L("sk-mix", 1, 25, 1, 9)], 2),
         ]),
         Cont("sc-seg-row", 1, 25, 12, 20, [
-            Cont("sc-core", 1, 9, 1, 10, [L("sk-core", 1, 25, 1, 9)], 2),
-            Cont("sc-mid", 9, 17, 1, 10, [L("sk-mid", 1, 25, 1, 9)], 2),
-            Cont("sc-ent", 17, 25, 1, 10, [L("sk-ent", 1, 25, 1, 9)], 2),
+            Cont("sc-core", 1, 7, 1, 10, [L("sk-core", 1, 25, 1, 9)], 2),
+            Cont("sc-mid", 7, 13, 1, 10, [L("sk-mid", 1, 25, 1, 9)], 2),
+            Cont("sc-ent", 13, 19, 1, 10, [L("sk-ent", 1, 25, 1, 9)], 2),
+            Cont("sc-unmap", 19, 25, 1, 10, [L("sk-unmap", 1, 25, 1, 9)], 2),
         ]),
         E("sk-note", 1, 25, 20, 22),
     ]

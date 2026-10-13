@@ -121,43 +121,69 @@ SELECT COUNT(*) AS WALKIN_OPPS, COALESCE(SUM(v),0) AS WALKIN_ACV FROM (
   GROUP BY 1 HAVING MAX(FCST_NETACV) BETWEEN 0 AND 2000000
 )"""
 
-    # 3a) Closed Q4 only — date-selective (ROTB can load this without open-pipeline scan).
+    # 3a) Closed Q4 — column-pruned projection before agg (Movement only).
     closed = """
 SELECT
-  COALESCE(SUM(IFF("Is Won", NETACV__C, 0)),0) AS WON_ACV,
-  COUNT(DISTINCT IFF("Is Won", ID, NULL)) AS WON_OPPS,
-  COALESCE(SUM(IFF(NOT "Is Won" AND NETACV__C BETWEEN 0 AND 50000, NETACV__C, 0)),0) AS LOST_ACV,
-  COUNT(DISTINCT IFF(NOT "Is Won" AND NETACV__C BETWEEN 0 AND 50000, ID, NULL)) AS LOST_OPPS
-FROM BI_PRESENTATION.REPORT.VW_PIPELINE
-WHERE "Is Closed"
-  AND "Close Date" >= '2026-10-01' AND "Close Date" < '2027-01-01'
+  COALESCE(SUM(IFF(IS_WON, NETACV, 0)), 0) AS WON_ACV,
+  COUNT(DISTINCT IFF(IS_WON, ID, NULL)) AS WON_OPPS,
+  COALESCE(SUM(IFF(NOT IS_WON AND NETACV BETWEEN 0 AND 50000, NETACV, 0)), 0) AS LOST_ACV,
+  COUNT(DISTINCT IFF(NOT IS_WON AND NETACV BETWEEN 0 AND 50000, ID, NULL)) AS LOST_OPPS
+FROM (
+  SELECT ID, "Is Won" AS IS_WON, NETACV__C AS NETACV
+  FROM BI_PRESENTATION.REPORT.VW_PIPELINE
+  WHERE "Is Closed"
+    AND "Close Date" >= '2026-10-01' AND "Close Date" < '2027-01-01'
+)
 """
 
-    # 3b) Open sourcing + SEG — NOT referenced by ROTB (Sourcing + Total only).
+    # 3b) Open sourcing + SEG — Sourcing page only (never bind on ROTB/Open/Total/Created).
+    # Column-prune then agg. Segment labels often include prefixes (e.g. "1 - Core").
     src_kpi = """
+WITH base AS (
+  SELECT
+    "Lead Source" AS LEAD_SRC,
+    -- Market tier is often a pipe token inside Segment/SplitSegment (e.g. "... | Core").
+    COALESCE(NULLIF(TRIM("SplitSegment"), ''), NULLIF(TRIM("Segment"), '')) AS SEG,
+    FCST_NETACV AS ACV
+  FROM BI_PRESENTATION.REPORT.VW_PIPELINE
+  WHERE NOT "Is Closed"
+    AND LEFT("Stage Name", 1) IN ('2', '3', '4', '5', '6', '7')
+    AND FCST_NETACV BETWEEN 0 AND 5000000
+),
+tagged AS (
+  SELECT
+    LEAD_SRC, ACV, SEG,
+    CASE
+      WHEN SEG IS NULL THEN NULL
+      WHEN CONTAINS(UPPER(SEG), 'MID-MARKET') OR CONTAINS(UPPER(SEG), 'MID MARKET')
+        OR SEG = 'MM' OR CONTAINS(UPPER(SEG), '| MID') THEN 'Mid-Market'
+      WHEN CONTAINS(UPPER(SEG), 'ENTERPRISE') OR CONTAINS(UPPER(SEG), 'UP-MARKET')
+        OR CONTAINS(UPPER(SEG), 'UP MARKET') OR CONTAINS(UPPER(SEG), 'UPMARKET') THEN 'Enterprise'
+      WHEN CONTAINS(UPPER(SEG), 'CORE') THEN 'Core'
+      ELSE NULL
+    END AS MKT_SEG
+  FROM base
+)
 SELECT
-  COALESCE(SUM(IFF("Lead Source"='Marketing', FCST_NETACV, 0)),0) AS MKT_ACV,
-  COALESCE(SUM(IFF("Lead Source"='Sales Generated', FCST_NETACV, 0)),0) AS SALES_ACV,
-  COALESCE(SUM(IFF("Lead Source" IN ('Marketing','Sales Generated'), FCST_NETACV, 0)),0) AS SRC_TOTAL_ACV,
+  COALESCE(SUM(IFF(LEAD_SRC = 'Marketing', ACV, 0)), 0) AS MKT_ACV,
+  COALESCE(SUM(IFF(LEAD_SRC = 'Sales Generated', ACV, 0)), 0) AS SALES_ACV,
+  COALESCE(SUM(IFF(LEAD_SRC IN ('Marketing', 'Sales Generated'), ACV, 0)), 0) AS SRC_TOTAL_ACV,
   IFF(
-    COALESCE(SUM(IFF("Lead Source" IN ('Marketing','Sales Generated'), FCST_NETACV, 0)),0) > 0,
-    COALESCE(SUM(IFF("Lead Source"='Marketing', FCST_NETACV, 0)),0)
-      / COALESCE(SUM(IFF("Lead Source" IN ('Marketing','Sales Generated'), FCST_NETACV, 0)),0),
+    COALESCE(SUM(IFF(LEAD_SRC IN ('Marketing', 'Sales Generated'), ACV, 0)), 0) > 0,
+    COALESCE(SUM(IFF(LEAD_SRC = 'Marketing', ACV, 0)), 0)
+      / COALESCE(SUM(IFF(LEAD_SRC IN ('Marketing', 'Sales Generated'), ACV, 0)), 0),
     0) AS MKT_MIX,
   IFF(
-    COALESCE(SUM(IFF("Lead Source" IN ('Marketing','Sales Generated'), FCST_NETACV, 0)),0) > 0,
-    COALESCE(SUM(IFF("Lead Source"='Sales Generated', FCST_NETACV, 0)),0)
-      / COALESCE(SUM(IFF("Lead Source" IN ('Marketing','Sales Generated'), FCST_NETACV, 0)),0),
+    COALESCE(SUM(IFF(LEAD_SRC IN ('Marketing', 'Sales Generated'), ACV, 0)), 0) > 0,
+    COALESCE(SUM(IFF(LEAD_SRC = 'Sales Generated', ACV, 0)), 0)
+      / COALESCE(SUM(IFF(LEAD_SRC IN ('Marketing', 'Sales Generated'), ACV, 0)), 0),
     0) AS SALES_MIX,
-  COALESCE(SUM(IFF(CONTAINS("Segment",'Core'), FCST_NETACV, 0)),0) AS SEG_CORE,
-  COALESCE(SUM(IFF(CONTAINS("Segment",'Mid') OR "Segment"='MM', FCST_NETACV, 0)),0) AS SEG_MID,
-  COALESCE(SUM(IFF(
-    CONTAINS("Segment",'Enterprise') OR CONTAINS("Segment",'Up-Market'),
-    FCST_NETACV, 0)),0) AS SEG_ENT
-FROM BI_PRESENTATION.REPORT.VW_PIPELINE
-WHERE NOT "Is Closed"
-  AND LEFT("Stage Name",1) IN ('2','3','4','5','6','7')
-  AND FCST_NETACV BETWEEN 0 AND 5000000
+  COALESCE(SUM(IFF(MKT_SEG = 'Core', ACV, 0)), 0) AS SEG_CORE,
+  COALESCE(SUM(IFF(MKT_SEG = 'Mid-Market', ACV, 0)), 0) AS SEG_MID,
+  COALESCE(SUM(IFF(MKT_SEG = 'Enterprise', ACV, 0)), 0) AS SEG_ENT,
+  COALESCE(SUM(IFF(MKT_SEG IS NULL, ACV, 0)), 0) AS SEG_UNMAPPED,
+  COALESCE(SUM(ACV), 0) AS OPEN_ALL_ACV
+FROM tagged
 """
 
     # 4) Funnel — Q4 open stages only (ACV metrics)
@@ -264,6 +290,7 @@ GROUP BY 1
         ("MKT_ACV", m()), ("SALES_ACV", m()), ("SRC_TOTAL_ACV", m()),
         ("MKT_MIX", p()), ("SALES_MIX", p()),
         ("SEG_CORE", m()), ("SEG_MID", m()), ("SEG_ENT", m()),
+        ("SEG_UNMAPPED", m()), ("OPEN_ALL_ACV", m()),
     ]
     return [
         sql_table("kpi-pack", "KPI Pack", pack, pack_cols),
