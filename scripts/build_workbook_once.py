@@ -382,8 +382,22 @@ def build():
           f'<p class="p-small" style="text-align:center"><span style="font-size:22px;color:{INK}">'
           f'M {ref(S,"MKT_MIX",".0%")} / S {ref(S,"SALES_MIX",".0%")}</span></p>\n'
           f'<p class="p-small" style="text-align:center"><span style="color:{MUTED}">target M 39% / S 61%</span></p>'),
+        C("sc-seg-row", SECTION, SECTION),
+        C("sc-core"), C("sc-mid"), C("sc-ent"),
+        T("sk-core",
+          label("CORE · OPEN ACV") + "\n" +
+          hero(ref(S, "SEG_CORE", "$,.2s"), BLUE, 28) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">2H target $18M</span></p>'),
+        T("sk-mid",
+          label("MID-MARKET · OPEN ACV") + "\n" +
+          hero(ref(S, "SEG_MID", "$,.2s"), TEAL, 28) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">2H target $16M</span></p>'),
+        T("sk-ent",
+          label("ENTERPRISE · OPEN ACV") + "\n" +
+          hero(ref(S, "SEG_ENT", "$,.2s"), ORANGE, 28) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">2H target $20M</span></p>'),
         T("sk-note",
-          f'<p class="p-small"><span style="color:{MUTED}">Open-VW 1-row agg · Marketing/Sales mix · also feeds segment context · Q4 FY2026</span></p>'),
+          f'<p class="p-small"><span style="color:{MUTED}">Open-VW 1-row agg · Lead Source + Segment · kept off ROTB/Open/Total/Created for speed · Q4 FY2026</span></p>'),
     ]
 
     # ═══════════════ MOVEMENT ═══════════════
@@ -557,7 +571,12 @@ TV = ACV product actuals; segment targets only on Total (segment actuals on Sour
             Cont("sc-t-card", 13, 19, 1, 10, [L("sk-t", 1, 25, 1, 9)], 2),
             Cont("sc-mix-card", 19, 25, 1, 10, [L("sk-mix", 1, 25, 1, 9)], 2),
         ]),
-        E("sk-note", 1, 25, 12, 14),
+        Cont("sc-seg-row", 1, 25, 12, 20, [
+            Cont("sc-core", 1, 9, 1, 10, [L("sk-core", 1, 25, 1, 9)], 2),
+            Cont("sc-mid", 9, 17, 1, 10, [L("sk-mid", 1, 25, 1, 9)], 2),
+            Cont("sc-ent", 17, 25, 1, 10, [L("sk-ent", 1, 25, 1, 9)], 2),
+        ]),
+        E("sk-note", 1, 25, 20, 22),
     ]
     movement_l = [
         E("movement-title", 1, 25, 1, 3),
