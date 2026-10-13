@@ -116,6 +116,7 @@ def build():
         ("WEEK_ACV", m()), ("WEEK_OPPS", None),
         ("CREATED_CLOSING_ACV", m()), ("CREATED_CLOSING_OPPS", None),
         ("WON_ACV", m()), ("WON_OPPS", None), ("LOST_ACV", m()), ("LOST_OPPS", None),
+        ("CREATED_WON_ACV", m()), ("CREATED_WON_OPPS", None),
         ("S0_OPPS", None), ("S0_ACV", m()), ("S1_OPPS", None), ("S1_ACV", m()),
         ("S2_OPPS", None), ("S2_ACV", m()),
         ("YEAR_GOAL", m()), ("Q4_GOAL", m()),
@@ -143,8 +144,9 @@ def build():
 
     # Column ids on wb-pack (must match pack_cols order above)
     PACK_YTD, PACK_Q4C = "wb-pack-12", "wb-pack-13"
-    PACK_YG, PACK_Q4G = "wb-pack-31", "wb-pack-32"
-    PACK_YEL, PACK_Q4EL = "wb-pack-33", "wb-pack-34"
+    # Indices shift +2 after CREATED_WON_* columns.
+    PACK_YG, PACK_Q4G = "wb-pack-33", "wb-pack-34"
+    PACK_YEL, PACK_Q4EL = "wb-pack-35", "wb-pack-36"
 
     plug = load_plugin_ids()
     PACE_ID, FUNNEL_ID, TV_ID = plug["pace"], plug["funnel"], plug["tv"]
@@ -245,9 +247,9 @@ def build():
           hero(ref(P, "CREATED_CLOSING_ACV", "$,.2s"), ORANGE, 32) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"CREATED_CLOSING_OPPS",",.0f")} opportunities</span></p>'),
         T("rk-cwq",
-          label("AVG DEAL SIZE") + "\n" +
-          hero(ref(P, "AVG_DEAL", "$,.2s"), GREEN, 32) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">Open Stage 2+ · pack grain</span></p>'),
+          label("CREATED & WON THIS QUARTER") + "\n" +
+          hero(ref(P, "CREATED_WON_ACV", "$,.2s"), GREEN, 32) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"CREATED_WON_OPPS",",.0f")} opportunities</span></p>'),
         T("rotb-s02", f'## <span style="color:{TEAL}">02 / COVERAGE</span>\nOpen pipeline'),
         C("cov-1", TEAL_BG, "#99f6e4"), C("cov-2"), C("cov-3"), C("cov-4"),
         T("rk-open", label("TOTAL OPEN PIPELINE") + "\n" + hero(ref(P, "TOTAL_ACV", "$,.2s"), TEAL, 32)),
