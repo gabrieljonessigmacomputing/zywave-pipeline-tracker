@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Open pipeline stage funnel</title>
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/@sigmacomputing/plugin@1.3.2/dist/umd/sigmacomputing-plugin.umd.js"></script>
+<style>
+  html,body{margin:0;padding:0;height:100%;background:transparent;
+    font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  #stage{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+  svg{display:block}
+  .name{font-size:12px;font-weight:600}
+  .amt{font-size:13px;font-weight:700}
+  .wait{font-size:13px;color:#64748b}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script>
+(function () {
+  "use strict";
+  var COLORS = ["#38bdf8", "#3b82f6", "#6366f1", "#a855f7", "#db2777", "#f9a8d4"];
+  var LIGHT_FILL = { "#38bdf8": 1, "#f9a8d4": 1 };
+  var stage = document.getElementById("stage");
+
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function money(v) {
+    v = Number(v) || 0;
+    if (v === 0) return "$0";
+    var units = [[1e12, "T"], [1e9, "B"], [1e6, "M"], [1e3, "K"]], a = Math.abs(v);
+    for (var i = 0; i < units.length; i++) {
+      if (a >= units[i][0]) {
+        var s = v / units[i][0];
+        return "$" + (Math.abs(s) >= 100 ? String(Math.round(s)) : s.toPrecision(2)) + units[i][1];
+      }
+    }
+    return "$" + (a >= 100 ? String(Math.round(v)) : Number(v.toPrecision(2)).toString());
+  }
+  function colKey(cfgVal) {
+    if (cfgVal == null || cfgVal === "") return null;
+    if (typeof cfgVal === "string" || typeof cfgVal === "number") return String(cfgVal);
+    if (Object.prototype.toString.call(cfgVal) === "[object Array]") return colKey(cfgVal[0]);
+    if (typeof cfgVal === "object") {
+      if (cfgVal.columnId != null) return String(cfgVal.columnId);
+      if (cfgVal.id != null) return String(cfgVal.id);
+    }
+    return null;
+  }
+  function sourceId(src) {
+    if (!src) return null;
+    if (typeof src === "string") return src;
+    if (typeof src === "object") return src.elementId || src.id || src.nodeId || null;
+    return null;
+  }
+
+  function draw(rows) {
+    var W = stage.clientWidth || 600, H = stage.clientHeight || 320;
+    if (W < 60 || H < 60 || !rows || !rows.length) { stage.innerHTML = ""; return; }
+
+    var n = rows.length, gap = 3, PAD = 6;
+    var segH = Math.max(18, (H - PAD * 2 - gap * (n - 1)) / n);
+    var maxV = 0;
+    rows.forEach(function (r) { maxV = Math.max(maxV, r.acv); });
+    if (!maxV) maxV = 1;
+    var MIN = 0.22;
+    var usable = W - PAD * 2, cx = W / 2;
+    function w(v) { return usable * Math.max(MIN, Math.min(1, v / maxV)); }
+
+    var s = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">';
+    for (var i = 0; i < n; i++) {
+      var r = rows[i];
+      var topW = w(r.acv);
+      var botW = i < n - 1 ? w(rows[i + 1].acv) : topW * 0.82;
+      if (botW > topW) botW = topW;
+      var y0 = PAD + i * (segH + gap), y1 = y0 + segH;
+      var color = COLORS[i % COLORS.length];
+      var pts = [cx - topW / 2, y0, cx + topW / 2, y0, cx + botW / 2, y1, cx - botW / 2, y1];
+      s += '<polygon points="' + pts.join(",") + '" fill="' + color + '"><title>' +
+           esc(r.stage) + ": " + money(r.acv) + '</title></polygon>';
+      var fg = LIGHT_FILL[color] ? "#0f172a" : "#ffffff";
+      var mid = (y0 + y1) / 2;
+      if (segH >= 34) {
+        s += '<text class="name" x="' + cx + '" y="' + (mid - 3) + '" text-anchor="middle" fill="' + fg + '">' + esc(r.stage) + '</text>';
+        s += '<text class="amt" x="' + cx + '" y="' + (mid + 13) + '" text-anchor="middle" fill="' + fg + '">' + money(r.acv) + '</text>';
+      } else {
+        s += '<text class="name" x="' + cx + '" y="' + (mid + 4) + '" text-anchor="middle" fill="' + fg + '">' +
+             esc(r.stage) + '  ·  ' + money(r.acv) + '</text>';
+      }
+    }
+    s += '</svg>';
+    stage.innerHTML = s;
+  }
+
+  function waiting(msg) {
+    stage.innerHTML = '<div class="wait">' + esc(msg || "Waiting for workbook data…") + '</div>';
+  }
+
+  function synth() {
+    return [
+      { stage: "2 - Analysis", acv: 5200000 },
+      { stage: "3 - Executive Alignment", acv: 4100000 },
+      { stage: "4 - Solution Validation", acv: 3000000 },
+      { stage: "5 - Negotiate", acv: 2100000 },
+      { stage: "6 - Finance Hold", acv: 1300000 },
+      { stage: "7 - Finance Review", acv: 700000 }
+    ];
+  }
+
+  function getClient() {
+    return (window.SigmaPlugin && window.SigmaPlugin.client)
+      || (window.sigma && window.sigma.plugin && window.sigma.plugin.client)
+      || (window.sigmaComputing && window.sigmaComputing.plugin && window.sigmaComputing.plugin.client)
+      || null;
+  }
+
+  var LAST = null, unsub = null;
+
+  function wire(client) {
+    client.config.configureEditorPanel([
+      { name: "source", type: "element" },
+      { name: "stage", type: "column", source: "source", allowedTypes: ["text"], label: "Stage (text)" },
+      { name: "acv", type: "column", source: "source", allowedTypes: ["number"], label: "ACV (number)" },
+      { name: "order", type: "column", source: "source", allowedTypes: ["number", "text"], label: "Stage order (optional)" }
+    ]);
+    client.config.subscribe(function (cfg) {
+      if (unsub) { unsub(); unsub = null; }
+      if (!cfg || !sourceId(cfg.source) || !colKey(cfg.stage) || !colKey(cfg.acv)) {
+        if (!LAST) draw(synth());
+        return;
+      }
+      waiting("Loading funnel…");
+      unsub = client.elements.subscribeToElementData(cfg.source, function (data) {
+        var sk = colKey(cfg.stage), ak = colKey(cfg.acv), ok = colKey(cfg.order);
+        var st = data && data[sk], ac = data && data[ak], od = ok && data ? data[ok] : null;
+        if (!st || !ac || !st.length) { waiting("Waiting for workbook data…"); return; }
+        var rows = [];
+        for (var i = 0; i < st.length; i++) {
+          rows.push({ stage: String(st[i] == null ? "" : st[i]), acv: Math.max(0, Number(ac[i]) || 0),
+                      order: od ? od[i] : null, idx: i });
+        }
+        rows.sort(function (a, b) {
+          if (od) {
+            var x = Number(a.order), y = Number(b.order);
+            if (isFinite(x) && isFinite(y) && x !== y) return x - y;
+            var c = String(a.order).localeCompare(String(b.order), undefined, { numeric: true });
+            if (c) return c;
+          }
+          return a.stage.localeCompare(b.stage, undefined, { numeric: true });
+        });
+        LAST = rows; draw(LAST);
+      });
+    });
+  }
+
+  var tries = 0;
+  (function boot() {
+    var client = getClient();
+    if (client) { wire(client); return; }
+    if (++tries < 40) { setTimeout(boot, 50); return; }
+    draw(synth());
+  })();
+
+  if (window.ResizeObserver) new ResizeObserver(function () { if (LAST) draw(LAST); }).observe(stage);
+  else window.addEventListener("resize", function () { if (LAST) draw(LAST); });
+})();
+</script>
+</body>
+</html>
