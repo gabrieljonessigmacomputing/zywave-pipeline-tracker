@@ -358,7 +358,13 @@ def build():
 
     # ═══════════════ SOURCING ═══════════════
     els += [
-        T("sourcing-title", f'# Pipeline Sourcing\n<p class="p-small"><span style="color:{MUTED}">Marketing vs Sales · Stage 2+</span></p>'),
+        T("sourcing-title", f'# Pipeline Sourcing\n<p class="p-small"><span style="color:{MUTED}">Marketing vs Sales · Stage 2+ · open-VW (slow) below · pack strip is ACV-fast</span></p>'),
+        C("sc-fast", TEAL_BG, "#99f6e4"),
+        T("sk-fast",
+          label("FAST STRIP · PACK (ACV)") + "\n" +
+          f'<p class="p-small"><span style="font-size:22px;color:{INK}">Q4 open {ref(P,"Q4_ACV","$,.2s")} · '
+          f'Total open {ref(P,"TOTAL_ACV","$,.2s")} · Created Q4 {ref(P,"Q4_CREATED_ACV","$,.2s")}</span></p>\n'
+          f'<p class="p-small"><span style="color:{MUTED}">Shows immediately · Lead Source / segment wait on VW below</span></p>'),
         C("sc-row", SECTION, SECTION),
         C("sc-m-card"), C("sc-s-card"), C("sc-t-card"), C("sc-mix-card", AMBER_BG, "#fbbf24"),
         T("sk-m",
@@ -576,19 +582,20 @@ Optional 14-day snapshot trend lives on this Data page only.
     ]
     sourcing_l = [
         E("sourcing-title", 1, 18, 1, 3), E("ctrl-period", 18, 25, 1, 3),
-        Cont("sc-row", 1, 25, 3, 12, [
+        Cont("sc-fast", 1, 25, 3, 7, [L("sk-fast", 1, 25, 1, 7)]),
+        Cont("sc-row", 1, 25, 7, 16, [
             Cont("sc-m-card", 1, 7, 1, 10, [L("sk-m", 1, 25, 1, 9)], 2),
             Cont("sc-s-card", 7, 13, 1, 10, [L("sk-s", 1, 25, 1, 9)], 2),
             Cont("sc-t-card", 13, 19, 1, 10, [L("sk-t", 1, 25, 1, 9)], 2),
             Cont("sc-mix-card", 19, 25, 1, 10, [L("sk-mix", 1, 25, 1, 9)], 2),
         ]),
-        Cont("sc-seg-row", 1, 25, 12, 20, [
+        Cont("sc-seg-row", 1, 25, 16, 24, [
             Cont("sc-core", 1, 7, 1, 10, [L("sk-core", 1, 25, 1, 9)], 2),
             Cont("sc-mid", 7, 13, 1, 10, [L("sk-mid", 1, 25, 1, 9)], 2),
             Cont("sc-ent", 13, 19, 1, 10, [L("sk-ent", 1, 25, 1, 9)], 2),
             Cont("sc-unmap", 19, 25, 1, 10, [L("sk-unmap", 1, 25, 1, 9)], 2),
         ]),
-        E("sk-note", 1, 25, 20, 22),
+        E("sk-note", 1, 25, 24, 26),
     ]
     movement_l = [
         E("movement-title", 1, 25, 1, 3),
