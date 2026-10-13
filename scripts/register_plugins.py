@@ -12,10 +12,10 @@ OUT = os.path.join(os.path.dirname(__file__), "..", "plugins", "plugin-ids.json"
 PLUGINS = [
     {
         "key": "pace",
-        "name": "Pipeline Tracker · Goal pace bar",
-        "description": "ROTB creation pace: orange fill (actual/goal) + dark paced tick.",
-        # Canonical paths — Sigma PATCH often ignores URL changes; overwrite these dirs on deploy.
-        "url": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/pace-bullet/",
+        # New name+URL → new pluginId (PATCH often ignores URL-only updates).
+        "name": "Pipeline Tracker · Goal pace bar v3",
+        "description": "ROTB creation pace: red/green vs paced tick + dark elapsed marker.",
+        "url": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/pace-bullet-v3/",
         "devUrl": "http://localhost:5173",
     },
     {

@@ -1,10 +1,10 @@
 {
-  "pace": "26bd0600-154e-4115-bdb8-95b651a2d15b",
+  "pace": "fc53186a-4f7b-4bef-9144-87a5a4a4862b",
   "funnel": "0f1120d9-7ef4-435e-8e8f-cf7b5e431dbc",
   "tv": "63543df3-b578-477a-890a-32e97b095c72",
   "openKpis": "45fc44ec-67b1-43b2-88ff-1fb5a5d515d7",
   "urls": {
-    "pace": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/pace-bullet/",
+    "pace": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/pace-bullet-v3/",
     "funnel": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/stage-funnel/",
     "tv": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/tv-dual-v5/",
     "openKpis": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/open-kpis/"
