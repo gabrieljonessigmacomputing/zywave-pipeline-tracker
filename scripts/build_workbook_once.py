@@ -507,9 +507,9 @@ def build():
         },
         T("data-note", """# Fast path
 
-ROTB / Open / Total / Created / Movement KPIs = ACV metrics (+ walk-in snapshot).
-Sourcing only = open presentation VW (Lead Source + SplitSegment tokens).
-Movement trend = 14-day snapshot VW. TV = ACV product; segment targets on Total.
+Hot pages (ROTB / Open / Total / Created / Movement) = ACV pack + walk-in + funnel/TV.
+Sourcing only hits open presentation VW (Lead Source + SplitSegment tokens).
+Optional 14-day snapshot trend lives on this Data page only.
 """),
     ]
 
