@@ -62,3 +62,15 @@ python3 scripts/build_workbook.py     # PUT workbook (DM sources only)
 - `~/.claude/skills/sigma-plugin-development` / `sigma-plugin-patterns`
 
 Auth: Zywave-only vars in `~/.zywave/sigma-zywave.env` (never other Sigma orgs).
+
+## Performance (v3 — current)
+
+ROTB KPIs load from **one** Snowflake query: `KPI ROTB Pack` (open + created + walk-in + closed + sourcing in a single statement).
+
+Workbook: `sql=0`, `data-model=10`. Charts are separate small GROUP BYs (only hit when those pages need them).
+
+Rebuild:
+```bash
+python3 scripts/build_data_model_fast.py
+python3 scripts/build_workbook_v3.py
+```
