@@ -84,11 +84,13 @@
     var barPct = clamp01(pct);
     var paced = d.paced === null || d.paced === undefined ? null : clamp01(d.paced);
     var fillC = normColor(d.fillColor, "#f97316"), tickC = normColor(d.tickColor, "#334155");
+    var through = paced !== null ? Math.round(paced * 100) + "% through period" : "";
 
     var h = "";
     if (d.title) h += '<div class="title">' + esc(d.title) + '</div>';
+    if (through) h += '<div class="foot" style="margin:0 0 2px">' + esc(through) + '</div>';
     h += '<div class="row"><span class="value">' + esc(fmt(actual, d.valueFormat)) + '</span>' +
-         '<span class="pct">' + Math.round(pct * 100) + '% of goal</span></div>';
+         '<span class="pct">' + (pct * 100).toFixed(1) + '% of goal</span></div>';
     h += '<div class="track"><div class="fill" style="width:' + (barPct * 100).toFixed(2) + '%"></div>';
     if (paced !== null) h += '<div class="tick" style="left:' + (paced * 100).toFixed(2) + '%"></div>';
     h += '</div>';

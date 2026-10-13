@@ -103,7 +103,10 @@ SELECT o.*, c.*,
   LEAST(1, DATEDIFF(day,'2026-01-01',CURRENT_DATE())/365.0) AS YEAR_ELAPSED,
   LEAST(1, GREATEST(0, DATEDIFF(day,'2026-10-01',CURRENT_DATE())/92.0)) AS Q4_ELAPSED,
   c.YTD_ACV/{YEAR_GOAL} AS YEAR_PCT_GOAL,
-  c.Q4_CREATED_ACV/{Q4_GOAL} AS Q4_PCT_GOAL
+  c.Q4_CREATED_ACV/{Q4_GOAL} AS Q4_PCT_GOAL,
+  IFF(o.TOTAL_ACV>0, o.CLOSE_CY_ACV/o.TOTAL_ACV, 0) AS CLOSE_CY_PCT,
+  IFF(o.TOTAL_ACV>0, o.CLOSE_NY_ACV/o.TOTAL_ACV, 0) AS CLOSE_NY_PCT,
+  IFF(o.TOTAL_ACV>0, o.CLOSE_FY_ACV/o.TOTAL_ACV, 0) AS CLOSE_FY_PCT
 FROM open_acv o CROSS JOIN created c
 """
 
@@ -238,6 +241,7 @@ SELECT 'SRC', a.DIM, 'Actual', a.ACTUAL, a.OPPS::FLOAT FROM src_act a
         ("YEAR_GOAL", m()), ("Q4_GOAL", m()),
         ("YEAR_ELAPSED", p()), ("Q4_ELAPSED", p()),
         ("YEAR_PCT_GOAL", p()), ("Q4_PCT_GOAL", p()),
+        ("CLOSE_CY_PCT", p()), ("CLOSE_NY_PCT", p()), ("CLOSE_FY_PCT", p()),
     ]
     vw_cols = [
         ("WON_ACV", m()), ("WON_OPPS", None), ("LOST_ACV", m()), ("LOST_OPPS", None),

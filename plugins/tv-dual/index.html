@@ -3,22 +3,43 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Target vs Actual dual bars</title>
+<title>Target vs Actual · Attainment</title>
 <style>
   html,body{margin:0;padding:0;height:100%;background:transparent;
     font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     color:#0f172a;-webkit-font-smoothing:antialiased}
-  #root{box-sizing:border-box;width:100%;height:100%;padding:8px 10px;
-    display:grid;grid-template-columns:1fr 1fr;gap:16px;min-width:0;min-height:0}
+  #root{box-sizing:border-box;width:100%;height:100%;padding:8px 12px 10px;
+    display:flex;flex-direction:column;gap:10px;min-width:0;min-height:0;overflow:auto}
+  .charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;flex:1 1 55%;min-height:160px}
   .panel{display:flex;flex-direction:column;min-width:0;min-height:0}
-  .title{font-size:13px;font-weight:600;color:#0f172a;margin:0 0 8px;white-space:nowrap;
+  .title{font-size:13px;font-weight:600;color:#0f172a;margin:0 0 6px;white-space:nowrap;
     overflow:hidden;text-overflow:ellipsis}
-  .chart{flex:1;min-height:0;position:relative}
+  .chart{flex:1;min-height:120px;position:relative}
   svg{display:block;width:100%;height:100%}
-  .axis{font-size:11px;fill:#64748b}
-  .lbl{font-size:11px;fill:#334155}
-  .legend{display:flex;gap:12px;margin-top:4px;font-size:11px;color:#64748b}
+  .axis{font-size:10px;fill:#64748b}
+  .lbl{font-size:10px;fill:#334155}
+  .legend{display:flex;gap:12px;margin-top:2px;font-size:11px;color:#64748b}
   .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+  .att{flex:0 0 auto}
+  .att h3{margin:0 0 6px;font-size:13px;font-weight:600}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{text-align:left;color:#64748b;font-weight:500;padding:6px 8px;border-bottom:1px solid #e2e8f0}
+  td{padding:7px 8px;border-bottom:1px solid #f1f5f9}
+  tr:nth-child(even) td{background:#f8fafc}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .pill{display:inline-block;min-width:52px;text-align:center;padding:2px 6px;border-radius:4px;
+    font-weight:600;font-size:11px}
+  .pill.bad{background:#fef2f2;color:#dc2626}
+  .pill.mid{background:#fffbeb;color:#d97706}
+  .pill.ok{background:#f0fdf4;color:#16a34a}
+  .src{flex:0 0 auto}
+  .src-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .src-card{border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;background:#fff}
+  .src-card .k{font-size:11px;color:#64748b;font-weight:500}
+  .src-card .v{font-size:22px;font-weight:700;margin:2px 0 6px}
+  .src-bar{height:8px;border-radius:999px;background:#e2e8f0;overflow:hidden}
+  .src-bar>i{display:block;height:100%;border-radius:999px}
+  .src-meta{font-size:11px;color:#64748b;margin-top:4px}
 </style>
 </head>
 <body>
@@ -28,7 +49,7 @@
 (function () {
   "use strict";
   var root = document.getElementById("root");
-  var BLUE = "#2563eb", GREEN = "#16a34a";
+  var BLUE = "#2563eb", GREEN = "#16a34a", ORANGE = "#f97316";
 
   function esc(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -45,28 +66,33 @@
     }
     return "$" + (a >= 100 ? String(Math.round(v)) : Number(v.toPrecision(2)).toString());
   }
+  function moneyFull(v) {
+    v = Number(v) || 0;
+    var neg = v < 0; v = Math.abs(v);
+    var s = Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return (neg ? "-$" : "$") + s;
+  }
 
   function groupRows(rows, grain) {
     var map = {}, order = [];
     rows.forEach(function (r) {
       if (r.grain !== grain) return;
-      if (!map[r.dim]) { map[r.dim] = { dim: r.dim, Target: 0, Actual: 0 }; order.push(r.dim); }
+      if (!map[r.dim]) { map[r.dim] = { dim: r.dim, Target: 0, Actual: 0, Opps: null }; order.push(r.dim); }
       if (r.series === "Target") map[r.dim].Target = r.val;
-      else if (r.series === "Actual") map[r.dim].Actual = r.val;
+      else if (r.series === "Actual") { map[r.dim].Actual = r.val; if (r.opps != null) map[r.dim].Opps = r.opps; }
     });
     return order.map(function (d) { return map[d]; });
   }
 
   function drawPanel(el, title, cats) {
-    var W = el.clientWidth || 280, H = el.clientHeight || 220;
+    var W = el.clientWidth || 280, H = el.clientHeight || 200;
     if (W < 40 || H < 40) { el.innerHTML = ""; return; }
-    var padL = 36, padR = 8, padT = 8, padB = 36;
+    var padL = 40, padR = 8, padT = 8, padB = 32;
     var iw = W - padL - padR, ih = H - padT - padB;
     var maxV = 1;
     cats.forEach(function (c) { maxV = Math.max(maxV, c.Target || 0, c.Actual || 0); });
     var n = Math.max(1, cats.length);
-    var groupW = iw / n, barW = Math.max(6, Math.min(22, groupW * 0.28));
-    var gap = 4;
+    var groupW = iw / n, barW = Math.max(6, Math.min(22, groupW * 0.28)), gap = 4;
 
     var s = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H +
             '" viewBox="0 0 ' + W + ' ' + H + '">';
@@ -100,6 +126,45 @@
       '"></span>Actual</span></div>';
   }
 
+  function pill(pct) {
+    var cls = pct >= 0.85 ? "ok" : pct >= 0.5 ? "mid" : "bad";
+    return '<span class="pill ' + cls + '">' + (pct * 100).toFixed(1) + '%</span>';
+  }
+
+  function attainmentHtml(seg) {
+    var rows = seg.slice();
+    var tT = 0, tA = 0;
+    rows.forEach(function (r) { tT += r.Target || 0; tA += r.Actual || 0; });
+    if (rows.length) rows.push({ dim: "Total", Target: tT, Actual: tA });
+    var h = '<div class="att"><h3>Attainment by New Segment</h3><table><thead><tr>' +
+      '<th>Segment</th><th class="num">H2 Goal</th><th class="num">H2 Actual</th>' +
+      '<th class="num">H2 Attainment</th><th class="num">H2 Pace</th></tr></thead><tbody>';
+    rows.forEach(function (r) {
+      var att = r.Target ? r.Actual / r.Target : 0;
+      // Pace vs calendar mid-year-ish: treat as attainment / elapsed; elapsed unknown → show attainment
+      h += '<tr><td>' + esc(r.dim) + '</td><td class="num">' + esc(moneyFull(r.Target)) +
+           '</td><td class="num">' + esc(moneyFull(r.Actual)) + '</td><td class="num">' +
+           pill(att) + '</td><td class="num">' + pill(att) + '</td></tr>';
+    });
+    return h + '</tbody></table></div>';
+  }
+
+  function srcHtml(src) {
+    var mkt = src.find(function (r) { return /market/i.test(r.dim); }) || { Actual: 0, Opps: 0 };
+    var sales = src.find(function (r) { return /sales/i.test(r.dim); }) || { Actual: 0, Opps: 0 };
+    var tot = (mkt.Actual || 0) + (sales.Actual || 0) || 1;
+    var mPct = (mkt.Actual || 0) / tot, sPct = (sales.Actual || 0) / tot;
+    return '<div class="src"><div class="title">Open Stage 2+ by Lead Source</div><div class="src-row">' +
+      '<div class="src-card"><div class="k">MARKETING-SOURCED</div><div class="v" style="color:' + BLUE +
+      '">' + esc(money(mkt.Actual)) + '</div><div class="src-bar"><i style="width:' +
+      (mPct * 100).toFixed(1) + '%;background:' + BLUE + '"></i></div><div class="src-meta">' +
+      (mPct * 100).toFixed(0) + '% of mix · target 39%</div></div>' +
+      '<div class="src-card"><div class="k">SALES-SOURCED</div><div class="v" style="color:' + ORANGE +
+      '">' + esc(money(sales.Actual)) + '</div><div class="src-bar"><i style="width:' +
+      (sPct * 100).toFixed(1) + '%;background:' + ORANGE + '"></i></div><div class="src-meta">' +
+      (sPct * 100).toFixed(0) + '% of mix · target 61%</div></div></div></div>';
+  }
+
   function synth() {
     return [
       { grain: "SEG", dim: "Core", series: "Target", val: 18000000 },
@@ -114,6 +179,8 @@
       { grain: "PROD", dim: "RQC & AMS", series: "Actual", val: 15000000 },
       { grain: "PROD", dim: "Platform Sales", series: "Target", val: 1000000 },
       { grain: "PROD", dim: "Platform Sales", series: "Actual", val: 800000 },
+      { grain: "SRC", dim: "Marketing", series: "Actual", val: 5500000, opps: 200 },
+      { grain: "SRC", dim: "Sales", series: "Actual", val: 8700000, opps: 400 },
     ];
   }
 
@@ -121,12 +188,14 @@
 
   function render(rows) {
     LAST = rows || LAST;
+    var seg = groupRows(LAST, "SEG");
+    var prod = groupRows(LAST, "PROD");
+    var src = groupRows(LAST, "SRC");
     root.innerHTML =
-      '<div class="panel" id="p-seg"></div><div class="panel" id="p-prod"></div>';
-    drawPanel(document.getElementById("p-seg"), "Pipeline by Segment: 2H Target vs Actual",
-              groupRows(LAST, "SEG"));
-    drawPanel(document.getElementById("p-prod"), "Pipeline by Product Group: 2H Target vs Actual",
-              groupRows(LAST, "PROD"));
+      '<div class="charts"><div class="panel" id="p-seg"></div><div class="panel" id="p-prod"></div></div>' +
+      attainmentHtml(seg) + srcHtml(src);
+    drawPanel(document.getElementById("p-seg"), "Pipeline by Segment: 2H Target vs Actual", seg);
+    drawPanel(document.getElementById("p-prod"), "Pipeline by Product Group: 2H Target vs Actual", prod);
   }
 
   var client = window.sigmaComputing && window.sigmaComputing.plugin
@@ -139,7 +208,8 @@
       { name: "grain", type: "column", source: "source", allowedTypes: ["text"], label: "Grain" },
       { name: "dim", type: "column", source: "source", allowedTypes: ["text"], label: "Dimension" },
       { name: "series", type: "column", source: "source", allowedTypes: ["text"], label: "Series" },
-      { name: "val", type: "column", source: "source", allowedTypes: ["number"], label: "Value" }
+      { name: "val", type: "column", source: "source", allowedTypes: ["number"], label: "Value" },
+      { name: "opps", type: "column", source: "source", allowedTypes: ["number"], label: "Opps (optional)" }
     ]);
     var unsub = null;
     client.config.subscribe(function (cfg) {
@@ -150,6 +220,7 @@
       unsub = client.elements.subscribeToElementData(cfg.source, function (data) {
         var g = data && data[cfg.grain], d = data && data[cfg.dim];
         var s = data && data[cfg.series], v = data && data[cfg.val];
+        var o = cfg.opps && data ? data[cfg.opps] : null;
         if (!g || !d || !s || !v || !g.length) { render(synth()); return; }
         var rows = [];
         for (var i = 0; i < g.length; i++) {
@@ -158,6 +229,7 @@
             dim: String(d[i] == null ? "" : d[i]),
             series: String(s[i] == null ? "" : s[i]),
             val: Math.max(0, Number(v[i]) || 0),
+            opps: o && o[i] != null ? Number(o[i]) : null,
           });
         }
         render(rows);

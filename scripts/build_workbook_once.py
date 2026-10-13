@@ -118,6 +118,7 @@ def build():
         ("YEAR_GOAL", m()), ("Q4_GOAL", m()),
         ("YEAR_ELAPSED", p()), ("Q4_ELAPSED", p()),
         ("YEAR_PCT_GOAL", p()), ("Q4_PCT_GOAL", p()),
+        ("CLOSE_CY_PCT", p()), ("CLOSE_NY_PCT", p()), ("CLOSE_FY_PCT", p()),
     ]
     els += [
         pass_tbl("wb-pack", "WB Pack", "kpi-pack", "KPI Pack", pack_cols),
@@ -178,7 +179,7 @@ def build():
         }
 
     def tv_plugin(eid, src_eid="wb-tv"):
-        # One warehouse job for segment + product Target vs Actual (client-side split).
+        # One warehouse job → dual charts + attainment table + sourcing mix (client-side).
         return {
             "id": eid, "kind": "plugin", "pluginId": TV_ID, "displayName": "Target vs Actual",
             "config": {
@@ -187,6 +188,7 @@ def build():
                 "dim": {"kind": "column", "columnId": f"{src_eid}-1", "source": "source"},
                 "series": {"kind": "column", "columnId": f"{src_eid}-2", "source": "source"},
                 "val": {"kind": "column", "columnId": f"{src_eid}-3", "source": "source"},
+                "opps": {"kind": "column", "columnId": f"{src_eid}-4", "source": "source"},
             },
             "style": {"backgroundColor": WHITE},
         }
@@ -282,6 +284,9 @@ def build():
         C("sg-m"), C("sg-s"),
         T("rk-mkt", label("MARKETING-SOURCED") + "\n" + hero(ref(S, "MKT_ACV", "$,.2s"), BLUE, 32)),
         T("rk-sales", label("SALES-SOURCED") + "\n" + hero(ref(S, "SALES_ACV", "$,.2s"), ORANGE, 32)),
+        T("rotb-progress",
+          f'<p class="p-small"><span style="color:{MUTED}">Year progress {ref(P,"YEAR_ELAPSED",".0%")} · '
+          f'Quarter progress {ref(P,"Q4_ELAPSED",".0%")}</span></p>'),
     ]
 
     # ═══════════════ OPEN (best sheet — keep density) ═══════════════
@@ -289,7 +294,7 @@ def build():
         els.append(C(cid))
     els += [
         T("open-title", f'# Open Pipeline\n<p class="p-small"><span style="color:{MUTED}">FY2026 Stage 2+ Pipeline by Close Date</span></p>'),
-        T("open-live", f'<p style="text-align:right"><span style="color:{GREEN}">Live from Snowflake</span></p>'),
+        T("open-live", f'<p class="p-small" style="text-align:right"><span style="color:{GREEN}">Live from Snowflake</span></p>'),
         T("ok-u", label("UNIQUE OPPORTUNITIES") + "\n" + hero(ref(P, "TOTAL_OPPS", ",.0f"), INK, 28)),
         T("ok-t", label("TOTAL PIPELINE ACV") + "\n" + hero(ref(P, "TOTAL_ACV", "$,.2s"), INK, 28)),
         T("ok-w",
@@ -307,17 +312,27 @@ def build():
           hero(ref(P, "Q4_ACV", "$,.2s"), INK, 32) + "\n" +
           f'<p class="p-small"><span style="color:{BLUE}">Close Date: Current Quarter</span></p>'),
         funnel_plugin("plugin-funnel"),
-        T("mv-left", f'<p class="p-small"><span style="color:{MUTED}">WHAT LEFT (Q4 CLOSED)</span></p>'),
-        C("mv-lost-c", RED_BG, "#fecaca"), C("mv-won-c", GREEN_BG, "#bbf7d0"),
+        T("mv-left", f'<p class="p-small"><span style="color:{MUTED}">WHAT LEFT</span></p>'),
+        C("mv-lost-c", RED_BG, "#fecaca"), C("mv-walk-c", "#eff6ff", "#93c5fd"),
+        T("mv-walk",
+          f'<p class="p-small"><span style="color:{BLUE}">Walk-in (Q4 start)</span></p>\n'
+          + hero(ref(W, "WALKIN_ACV", "$,.2s"), BLUE, 26) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">Frozen · {ref(W,"WALKIN_OPPS",",.0f")} opps</span></p>'),
         T("mv-lost",
           f'<p class="p-small"><span style="color:{RED}">Closed Lost</span></p>\n'
           + hero(ref(Z, "LOST_ACV", "$,.2s"), RED, 26) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">{ref(Z,"LOST_OPPS",",.0f")} opps · ≤ $50k</span></p>'),
+        T("mv-also", f'<p class="p-small"><span style="color:{MUTED}">ALSO LEFT PIPELINE</span></p>'),
+        C("mv-won-c", GREEN_BG, "#bbf7d0"), C("mv-early-c", RED_BG, "#fecaca"),
+        T("mv-early",
+          f'<p class="p-small"><span style="color:{RED}">Early stage open (S0+S1)</span></p>\n'
+          + hero(ref(ERL, "S0_ACV", "$,.2s"), RED, 22) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">S0 {ref(ERL,"S0_OPPS",",.0f")} · S1 {ref(ERL,"S1_OPPS",",.0f")} opps</span></p>'),
         T("mv-won",
           f'<p class="p-small"><span style="color:{GREEN}">Closed Won</span></p>\n'
           + hero(ref(Z, "WON_ACV", "$,.2s"), GREEN, 26) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">{ref(Z,"WON_OPPS",",.0f")} opps</span></p>'),
-        T("mv-add", f'<p class="p-small"><span style="color:{MUTED}">WHAT ADDED (Q4 CREATED)</span></p>'),
+        T("mv-add", f'<p class="p-small"><span style="color:{MUTED}">WHAT ADDED</span></p>'),
         C("mv-cr-c", GREEN_BG, "#bbf7d0"), C("mv-ccq-c", AMBER_BG, "#fbbf24"),
         T("mv-cr",
           f'<p class="p-small"><span style="color:{GREEN}">Created This Quarter</span></p>\n'
@@ -419,10 +434,10 @@ def build():
           hero(ref(P, "CREATED_CLOSING_ACV", "$,.2s"), ORANGE, 28) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"CREATED_CLOSING_OPPS",",.0f")} opps</span></p>'),
         T("ckp-won",
-          label("CLOSED WON THIS Q") + "\n" +
+          label("CREATED & WON THIS Q") + "\n" +
           hero(ref(Z, "WON_ACV", "$,.2s"), GREEN, 28) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">{ref(Z,"WON_OPPS",",.0f")} opps</span></p>'),
-        T("bridge-h", f'## Pipeline Bridge — Q4 FY2026\n<span style="color:{MUTED}">Open (Qtr Start) + Created − Won − Lost = Total Open</span>'),
+          f'<p class="p-small"><span style="color:{MUTED}">{ref(Z,"WON_OPPS",",.0f")} opps · entered Stage 2 this Q</span></p>'),
+        T("bridge-h", f'## Pipeline Bridge — Q4 FY2026\n<span style="color:{MUTED}">Walk-in at quarter start + created − won − lost ≈ total open today</span>'),
         C("cc-start"), C("cc-cr", GREEN_BG, "#bbf7d0"), C("cc-wn", RED_BG, "#fecaca"),
         C("cc-ls", RED_BG, "#fecaca"), C("cc-tot", "#eff6ff", "#93c5fd"),
         T("ck-start", label("OPEN (QTR START)") + "\n" + hero(ref(W, "WALKIN_ACV", "$,.0f"), BLUE, 24)),
@@ -436,9 +451,18 @@ def build():
         T("ck-tot", label("TOTAL OPEN") + "\n" + hero(ref(P, "TOTAL_ACV", "$,.0f"), BLUE, 24)),
         T("close-h", f'## Total open pipeline by close year\n<span style="color:{MUTED}">Share of open ACV</span>'),
         C("cc-cy"), C("cc-ny"), C("cc-fy"),
-        T("ck-cy", label("CURRENT YEAR (2026)") + "\n" + hero(ref(P, "CLOSE_CY_ACV", "$,.0f"), TEAL, 26)),
-        T("ck-ny", label("NEXT YEAR (2027)") + "\n" + hero(ref(P, "CLOSE_NY_ACV", "$,.0f"), BLUE, 26)),
-        T("ck-fy", label("FUTURE YEARS (2028+)") + "\n" + hero(ref(P, "CLOSE_FY_ACV", "$,.0f"), MUTED, 26)),
+        T("ck-cy",
+          label("CURRENT YEAR (2026)") + "\n" +
+          hero(ref(P, "CLOSE_CY_ACV", "$,.0f"), TEAL, 26) + "\n" +
+          f'<p class="p-small"><span style="color:{TEAL}">{ref(P,"CLOSE_CY_PCT",".0%")} of open</span></p>'),
+        T("ck-ny",
+          label("NEXT YEAR (2027)") + "\n" +
+          hero(ref(P, "CLOSE_NY_ACV", "$,.0f"), BLUE, 26) + "\n" +
+          f'<p class="p-small"><span style="color:{BLUE}">{ref(P,"CLOSE_NY_PCT",".0%")} of open</span></p>'),
+        T("ck-fy",
+          label("FUTURE YEARS (2028+)") + "\n" +
+          hero(ref(P, "CLOSE_FY_ACV", "$,.0f"), MUTED, 26) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"CLOSE_FY_PCT",".0%")} of open</span></p>'),
         # Chart sources DM directly — no pass-through table (avoids CREATED_MO ×2).
         {
             "id": "chart-created", "kind": "bar-chart", "name": "Pipeline Created by Month (Stage 2+)",
@@ -465,35 +489,36 @@ Pace + dual TV + funnel plugins subscribe to pass-through tables (no SumIf re-in
 
     rotb = [
         E("rotb-title", 1, 18, 1, 3), E("rotb-badge", 18, 25, 1, 3),
-        Cont("sec-01", 1, 25, 3, 13, [
+        Cont("sec-01", 1, 25, 3, 14, [
             L("rotb-s01", 1, 25, 1, 2),
-            Cont("card-year", 1, 6, 2, 11, [L("plugin-pace-year", 1, 25, 1, 10)], 2),
-            Cont("card-q4", 6, 11, 2, 11, [L("plugin-pace-q4", 1, 25, 1, 10)], 2),
-            Cont("card-week", 11, 15, 2, 11, [L("rk-week", 1, 25, 1, 9)], 2),
-            Cont("card-ccq", 15, 20, 2, 11, [L("rk-ccq", 1, 25, 1, 9)], 2),
-            Cont("card-cwq", 20, 25, 2, 11, [L("rk-cwq", 1, 25, 1, 9)], 2),
+            Cont("card-year", 1, 6, 2, 10, [L("plugin-pace-year", 1, 25, 1, 10)], 2),
+            Cont("card-q4", 6, 11, 2, 10, [L("plugin-pace-q4", 1, 25, 1, 10)], 2),
+            Cont("card-week", 11, 15, 2, 10, [L("rk-week", 1, 25, 1, 9)], 2),
+            Cont("card-ccq", 15, 20, 2, 10, [L("rk-ccq", 1, 25, 1, 9)], 2),
+            Cont("card-cwq", 20, 25, 2, 10, [L("rk-cwq", 1, 25, 1, 9)], 2),
+            L("rotb-progress", 1, 25, 10, 12),
         ]),
-        Cont("sec-02", 1, 25, 13, 18, [
+        Cont("sec-02", 1, 25, 14, 19, [
             L("rotb-s02", 1, 25, 1, 2),
             Cont("cov-1", 1, 7, 2, 6, [L("rk-open", 1, 25, 1, 8)], 2),
             Cont("cov-2", 7, 13, 2, 6, [L("rk-cq", 1, 25, 1, 8)], 2),
             Cont("cov-3", 13, 19, 2, 6, [L("rk-nq", 1, 25, 1, 8)], 2),
             Cont("cov-4", 19, 25, 2, 6, [L("rk-2q", 1, 25, 1, 8)], 2),
         ]),
-        Cont("sec-03", 1, 25, 18, 23, [
+        Cont("sec-03", 1, 25, 19, 24, [
             L("rotb-s03", 1, 25, 1, 2),
             Cont("mgmt-w", 1, 9, 2, 6, [L("rk-walk", 1, 25, 1, 8)], 2),
             Cont("mgmt-l", 9, 17, 2, 6, [L("rk-lost", 1, 25, 1, 8)], 2),
             Cont("mgmt-n", 17, 25, 2, 6, [L("rk-won2", 1, 25, 1, 8)], 2),
         ]),
-        Cont("sec-04", 1, 25, 23, 28, [
+        Cont("sec-04", 1, 25, 24, 29, [
             L("rotb-s04", 1, 25, 1, 2),
             Cont("dm-s0", 1, 7, 2, 6, [L("dm-s0-b", 1, 25, 1, 8)], 2),
             Cont("dm-s1", 7, 13, 2, 6, [L("dm-s1-b", 1, 25, 1, 8)], 2),
             Cont("dm-s2", 13, 19, 2, 6, [L("dm-s2-b", 1, 25, 1, 8)], 2),
             Cont("dm-mo", 19, 25, 2, 6, [L("dm-mo-b", 1, 25, 1, 8)], 2),
         ]),
-        Cont("sec-05", 1, 25, 28, 33, [
+        Cont("sec-05", 1, 25, 29, 34, [
             L("rotb-s05", 1, 25, 1, 2),
             Cont("sg-m", 1, 13, 2, 6, [L("rk-mkt", 1, 25, 1, 8)], 2),
             Cont("sg-s", 13, 25, 2, 6, [L("rk-sales", 1, 25, 1, 8)], 2),
@@ -507,14 +532,17 @@ Pace + dual TV + funnel plugins subscribe to pass-through tables (no SumIf re-in
         Cont("okc-w", 11, 16, 4, 8, [L("ok-w", 1, 25, 1, 8)]),
         Cont("okc-q", 16, 21, 4, 8, [L("ok-q", 1, 25, 1, 8)]),
         Cont("okc-avg", 21, 25, 4, 8, [L("ok-avg", 1, 25, 1, 8)]),
-        Cont("okc-chg", 1, 25, 8, 22, [
-            L("open-chg", 1, 25, 1, 2), L("ok-q4tot", 1, 9, 2, 5), L("plugin-funnel", 1, 15, 5, 16),
+        Cont("okc-chg", 1, 25, 8, 24, [
+            L("open-chg", 1, 25, 1, 2), L("ok-q4tot", 1, 9, 2, 5), L("plugin-funnel", 1, 15, 5, 17),
             L("mv-left", 15, 25, 2, 3),
-            Cont("mv-lost-c", 15, 20, 3, 7, [L("mv-lost", 1, 25, 1, 8)], 2),
-            Cont("mv-won-c", 20, 25, 3, 7, [L("mv-won", 1, 25, 1, 8)], 2),
-            L("mv-add", 15, 25, 7, 8),
-            Cont("mv-cr-c", 15, 20, 8, 12, [L("mv-cr", 1, 25, 1, 8)], 2),
-            Cont("mv-ccq-c", 20, 25, 8, 12, [L("mv-ccq", 1, 25, 1, 8)], 2),
+            Cont("mv-walk-c", 15, 20, 3, 7, [L("mv-walk", 1, 25, 1, 8)], 2),
+            Cont("mv-lost-c", 20, 25, 3, 7, [L("mv-lost", 1, 25, 1, 8)], 2),
+            L("mv-also", 15, 25, 7, 8),
+            Cont("mv-early-c", 15, 20, 8, 12, [L("mv-early", 1, 25, 1, 8)], 2),
+            Cont("mv-won-c", 20, 25, 8, 12, [L("mv-won", 1, 25, 1, 8)], 2),
+            L("mv-add", 15, 25, 12, 13),
+            Cont("mv-cr-c", 15, 20, 13, 17, [L("mv-cr", 1, 25, 1, 8)], 2),
+            Cont("mv-ccq-c", 20, 25, 13, 17, [L("mv-ccq", 1, 25, 1, 8)], 2),
         ]),
     ]
     total_l = [
@@ -522,8 +550,8 @@ Pace + dual TV + funnel plugins subscribe to pass-through tables (no SumIf re-in
         Cont("tc-1", 1, 9, 3, 8, [L("tk-cq", 1, 25, 1, 8)]),
         Cont("tc-2", 9, 17, 3, 8, [L("tk-nq", 1, 25, 1, 8)]),
         Cont("tc-3", 17, 25, 3, 8, [L("tk-2q", 1, 25, 1, 8)]),
-        E("plugin-tv", 1, 25, 8, 18),
-        E("total-defs", 1, 25, 18, 20),
+        E("plugin-tv", 1, 25, 8, 26),
+        E("total-defs", 1, 25, 26, 28),
     ]
     sourcing_l = [
         E("sourcing-title", 1, 18, 1, 3), E("ctrl-period", 18, 25, 1, 3),
