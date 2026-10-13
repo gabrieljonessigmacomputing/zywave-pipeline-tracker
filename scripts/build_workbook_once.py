@@ -128,6 +128,7 @@ def build():
         ("PACK_WALKIN_OPPS", None), ("PACK_WALKIN_ACV", m()),
         ("Q4_COVERAGE", p()), ("YEAR_COVERAGE", p()),
         ("OTHER_ADJ_ACV", m()), ("Q4_OTHER_ADJ_ACV", m()),
+        ("MONTH_GOAL", m()), ("MONTH_ELAPSED", p()), ("MONTH_PCT_GOAL", p()),
     ]
     els += [
         pass_tbl("wb-pack", "WB Pack", "kpi-pack", "KPI Pack", pack_cols),
@@ -161,6 +162,9 @@ def build():
     PACK_YTD, PACK_Q4C = "wb-pack-17", "wb-pack-18"
     PACK_YG, PACK_Q4G = "wb-pack-38", "wb-pack-39"
     PACK_YEL, PACK_Q4EL = "wb-pack-40", "wb-pack-41"
+    # MONTH_ACV=20, MONTH_GOAL / MONTH_ELAPSED appended after OTHER_ADJ cols
+    PACK_MO = "wb-pack-20"
+    PACK_MOG, PACK_MOEL = "wb-pack-53", "wb-pack-54"
 
     plug = load_plugin_ids()
     PACE_ID, FUNNEL_ID, TV_ID = plug["pace"], plug["funnel"], plug["tv"]
@@ -266,10 +270,22 @@ def build():
           f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"CREATED_WON_OPPS",",.0f")} opportunities</span></p>'),
         T("rotb-s02", f'## <span style="color:{TEAL}">02 / COVERAGE</span>\nOpen pipeline'),
         C("cov-1", TEAL_BG, "#99f6e4"), C("cov-2"), C("cov-3"), C("cov-4"),
-        T("rk-open", label("TOTAL OPEN PIPELINE") + "\n" + hero(ref(P, "TOTAL_ACV", "$,.2s"), TEAL, 32)),
-        T("rk-cq", label("CLOSING THIS QUARTER") + "\n" + hero(ref(P, "Q4_ACV", "$,.2s"), BLUE, 32)),
-        T("rk-nq", label("CLOSING NEXT QUARTER") + "\n" + hero(ref(P, "NQ_ACV", "$,.2s"), BLUE, 32)),
-        T("rk-2q", label("CLOSING TWO QUARTERS OUT") + "\n" + hero(ref(P, "Q2OUT_ACV", "$,.2s"), BLUE, 32)),
+        T("rk-open",
+          label("TOTAL OPEN PIPELINE") + "\n" +
+          hero(ref(P, "TOTAL_ACV", "$,.2s"), TEAL, 32) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"TOTAL_OPPS",",.0f")} opportunities</span></p>'),
+        T("rk-cq",
+          label("CLOSING THIS QUARTER") + "\n" +
+          hero(ref(P, "Q4_ACV", "$,.2s"), BLUE, 32) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">Q4 2026 · {ref(P,"Q4_OPPS",",.0f")} opportunities</span></p>'),
+        T("rk-nq",
+          label("CLOSING NEXT QUARTER") + "\n" +
+          hero(ref(P, "NQ_ACV", "$,.2s"), BLUE, 32) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">Q1 2027 · {ref(P,"NQ_OPPS",",.0f")} opportunities</span></p>'),
+        T("rk-2q",
+          label("CLOSING TWO QUARTERS OUT") + "\n" +
+          hero(ref(P, "Q2OUT_ACV", "$,.2s"), BLUE, 32) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">Q2 2027 · {ref(P,"Q2OUT_OPPS",",.0f")} opportunities</span></p>'),
         T("rotb-s03", f'## <span style="color:{MUTED}">03 / PIPELINE MANAGEMENT</span>\nQ4 walk-in + closed (ACV pack · same grain as Movement)'),
         C("mgmt-w"), C("mgmt-won", GREEN_BG, "#bbf7d0"), C("mgmt-lost", RED_BG, "#fecaca"),
         T("rk-walk",
@@ -302,14 +318,11 @@ def build():
           label("STAGE 2 CREATED THIS MONTH") + "\n" +
           hero(ref(P, "MONTH_ACV", "$,.2s"), ORANGE, 28) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"MONTH_OPPS",",.0f")} opportunities</span></p>'),
-        # 05 Marketing — chrome only (no MQL feed); never bind open-VW here
+        # 05 Marketing — ACV month pace + early open proxies (no MQL feed / no open-VW)
         C("sec-05", SECTION, SECTION),
-        T("rotb-s05", f'## <span style="color:{BLUE}">05 / MARKETING PERFORMANCE</span>\nTop-of-funnel · awaiting dedicated MQL feed'),
-        C("mkt-mql"), C("mkt-s0"), C("mkt-s1"), C("mkt-s2"),
-        T("rk-mql",
-          label("MQLS") + "\n" +
-          hero("—", MUTED, 28) + "\n" +
-          f'<p class="p-small"><span style="color:{MUTED}">Awaiting top-of-funnel feed</span></p>'),
+        T("rotb-s05", f'## <span style="color:{BLUE}">05 / MARKETING PERFORMANCE</span>\nDemand signals · month creation pace (ACV) · MQL feed pending'),
+        C("mkt-pace"), C("mkt-s0"), C("mkt-s1"), C("mkt-s2"),
+        pace_plugin("plugin-pace-month", "Stage 2 $ created this month", PACK_MO, PACK_MOG, PACK_MOEL),
         T("rk-mkt-s0",
           label("STAGE 0 (OPEN)") + "\n" +
           hero(ref(P, "S0_ACV", "$,.2s"), BLUE, 28) + "\n" +
@@ -444,6 +457,28 @@ def build():
             "xAxis": {"columnId": "cp-p"},
             "yAxis": {"columnIds": ["cp-v"]},
             "color": {"by": "single", "value": BLUE},
+            "style": {"backgroundColor": WHITE, "borderRadius": "round", "borderColor": BORDER, "borderWidth": 1},
+        },
+        T("open-sum-h", f'## Summary tables\n<span style="color:{MUTED}">Q4 stage funnel + product group · same ACV grains (no extra SQL)</span>'),
+        # Pass-through only — no Sum() (would re-inline custom SQL).
+        {
+            "id": "tbl-stage-sum", "kind": "table", "name": "Summary by Stage (Q4)",
+            "source": dm("chart-funnel"),
+            "columns": [
+                {"id": "tss-s", "name": "Stage", "formula": "[Chart Funnel/STAGE]"},
+                {"id": "tss-o", "name": "Ord", "formula": "[Chart Funnel/ORD]"},
+                {"id": "tss-a", "name": "ACV", "formula": "[Chart Funnel/ACV]", "format": m()},
+            ],
+            "style": {"backgroundColor": WHITE, "borderRadius": "round", "borderColor": BORDER, "borderWidth": 1},
+        },
+        {
+            "id": "tbl-prod-sum", "kind": "table", "name": "Summary by Product",
+            "source": dm("chart-product"),
+            "columns": [
+                {"id": "tps-p", "name": "Product", "formula": "[Chart Product Category/PRODUCT]"},
+                {"id": "tps-d", "name": "Deals", "formula": "[Chart Product Category/OPPS]"},
+                {"id": "tps-a", "name": "ACV", "formula": "[Chart Product Category/ACV]", "format": m()},
+            ],
             "style": {"backgroundColor": WHITE, "borderRadius": "round", "borderColor": BORDER, "borderWidth": 1},
         },
     ]
@@ -653,6 +688,15 @@ def build():
           label("SMALL DEALS (< $50k)") + "\n" +
           hero(ref(P, "SMALL_OPPS", ",.0f"), GREEN, 28) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"SMALL_ACV","$,.2s")} ACV</span></p>'),
+        C("mc-cov-y", TEAL_BG, "#99f6e4"), C("mc-cov-q", "#eff6ff", "#93c5fd"),
+        T("mk-cov-y",
+          label("YEAR OPEN COVERAGE") + "\n" +
+          hero(ref(P, "YEAR_COVERAGE", ".1%"), TEAL, 28) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">Total open / year creation goal</span></p>'),
+        T("mk-cov-q",
+          label("Q4 OPEN COVERAGE") + "\n" +
+          hero(ref(P, "Q4_COVERAGE", ".1%"), BLUE, 28) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">Q4 open / Q4 creation goal</span></p>'),
         T("mv-bridge-h", f'## Q4 bridge\n<span style="color:{MUTED}">Walk-in + created − won − lost · pack grain · no daily snapshot VW</span>'),
         C("mb-w"), C("mb-c", GREEN_BG, "#bbf7d0"), C("mb-won", GREEN_BG, "#bbf7d0"), C("mb-lost", RED_BG, "#fecaca"), C("mb-q", "#eff6ff", "#93c5fd"),
         T("mb-walk", label("WALK-IN") + "\n" + hero(ref(W, "WALKIN_ACV", "$,.2s"), TEAL, 26)),
@@ -689,7 +733,7 @@ def build():
           label("CREATED & WON THIS Q") + "\n" +
           hero(ref(P, "CREATED_WON_ACV", "$,.2s"), GREEN, 28) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"CREATED_WON_OPPS",",.0f")} opps · pack</span></p>'),
-        T("bridge-h", f'## Pipeline Bridge — Q4 FY2026\n<span style="color:{MUTED}">Walk-in + Created − Won − Lost ≈ Open · pack grain</span>'),
+        T("bridge-h", f'## Pipeline Bridge — Q4 FY2026\n<span style="color:{MUTED}">Walk-in + Created − Won − Lost + Other Adj ≈ Open · pack grain</span>'),
         C("cc-start"), C("cc-cr", GREEN_BG, "#bbf7d0"), C("cc-won", GREEN_BG, "#bbf7d0"),
         C("cc-lost", RED_BG, "#fecaca"), C("cc-tot", "#eff6ff", "#93c5fd"),
         T("ck-start", label("WALK-IN (QTR START)") + "\n" + hero(ref(W, "WALKIN_ACV", "$,.2s"), BLUE, 22)),
@@ -849,14 +893,14 @@ Coverage / ABM = pack chrome (no open-VW). No daily snapshot grain.
             Cont("dm-s2", 13, 19, 2, 6, [L("dm-s2-b", 1, 25, 1, 2)], 2),
             Cont("dm-mo", 19, 25, 2, 6, [L("dm-mo-b", 1, 25, 1, 2)], 2),
         ]),
-        Cont("sec-05", 1, 25, 32, 39, [
+        Cont("sec-05", 1, 25, 32, 41, [
             L("rotb-s05", 1, 25, 1, 2),
-            Cont("mkt-mql", 1, 7, 2, 6, [L("rk-mql", 1, 25, 1, 2)], 2),
-            Cont("mkt-s0", 7, 13, 2, 6, [L("rk-mkt-s0", 1, 25, 1, 2)], 2),
-            Cont("mkt-s1", 13, 19, 2, 6, [L("rk-mkt-s1", 1, 25, 1, 2)], 2),
-            Cont("mkt-s2", 19, 25, 2, 6, [L("rk-mkt-s2", 1, 25, 1, 2)], 2),
+            Cont("mkt-pace", 1, 10, 2, 10, [L("plugin-pace-month", 1, 25, 1, 8)], 2),
+            Cont("mkt-s0", 10, 15, 2, 10, [L("rk-mkt-s0", 1, 25, 1, 2)], 2),
+            Cont("mkt-s1", 15, 20, 2, 10, [L("rk-mkt-s1", 1, 25, 1, 2)], 2),
+            Cont("mkt-s2", 20, 25, 2, 10, [L("rk-mkt-s2", 1, 25, 1, 2)], 2),
         ]),
-        Cont("sec-06", 1, 25, 39, 45, [
+        Cont("sec-06", 1, 25, 41, 47, [
             L("rotb-s06", 1, 25, 1, 2),
             Cont("sg-note", 1, 25, 2, 5, [L("rk-sg", 1, 25, 1, 2)], 2),
         ]),
@@ -895,6 +939,9 @@ Coverage / ABM = pack chrome (no open-VW). No daily snapshot grain.
         E("chart-closemo", 1, 25, 32, 44),
         E("open-prod-h", 1, 25, 44, 46),
         E("chart-product", 1, 25, 46, 56),
+        E("open-sum-h", 1, 25, 56, 58),
+        E("tbl-stage-sum", 1, 13, 58, 68),
+        E("tbl-prod-sum", 13, 25, 58, 68),
     ]
     total_l = [
         E("total-title", 1, 25, 1, 3),
@@ -954,13 +1001,15 @@ Coverage / ABM = pack chrome (no open-VW). No daily snapshot grain.
         Cont("mc-8", 7, 13, 13, 18, [L("mk-avg", 1, 25, 1, 2)]),
         Cont("mc-9", 13, 19, 13, 18, [L("mk-large", 1, 25, 1, 2)]),
         Cont("mc-10", 19, 25, 13, 18, [L("mk-small", 1, 25, 1, 2)]),
-        E("mv-bridge-h", 1, 25, 18, 20),
-        Cont("mb-w", 1, 6, 20, 26, [L("mb-walk", 1, 25, 1, 2)]),
-        Cont("mb-c", 6, 11, 20, 26, [L("mb-cr", 1, 25, 1, 2)]),
-        Cont("mb-won", 11, 16, 20, 26, [L("mb-wn", 1, 25, 1, 2)]),
-        Cont("mb-lost", 16, 21, 20, 26, [L("mb-ls", 1, 25, 1, 2)]),
-        Cont("mb-q", 21, 25, 20, 26, [L("mb-q4", 1, 25, 1, 2)]),
-        E("mv-snap-note", 1, 25, 26, 28),
+        Cont("mc-cov-y", 1, 13, 18, 23, [L("mk-cov-y", 1, 25, 1, 2)]),
+        Cont("mc-cov-q", 13, 25, 18, 23, [L("mk-cov-q", 1, 25, 1, 2)]),
+        E("mv-bridge-h", 1, 25, 23, 25),
+        Cont("mb-w", 1, 6, 25, 31, [L("mb-walk", 1, 25, 1, 2)]),
+        Cont("mb-c", 6, 11, 25, 31, [L("mb-cr", 1, 25, 1, 2)]),
+        Cont("mb-won", 11, 16, 25, 31, [L("mb-wn", 1, 25, 1, 2)]),
+        Cont("mb-lost", 16, 21, 25, 31, [L("mb-ls", 1, 25, 1, 2)]),
+        Cont("mb-q", 21, 25, 25, 31, [L("mb-q4", 1, 25, 1, 2)]),
+        E("mv-snap-note", 1, 25, 31, 33),
     ]
     created_l = [
         E("created-title", 1, 25, 1, 3),

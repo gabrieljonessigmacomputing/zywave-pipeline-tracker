@@ -169,7 +169,11 @@ SELECT o.*, c.*, z.*, e.*,
   IFF({YEAR_GOAL}>0, o.TOTAL_ACV/{YEAR_GOAL}, 0) AS YEAR_COVERAGE,
   -- Bridge residual (stills "Other Adjustments"): open − (walk-in + created − won − lost)
   o.TOTAL_ACV - (w.WALKIN_ACV + c.Q4_CREATED_ACV - z.WON_ACV - z.LOST_ACV) AS OTHER_ADJ_ACV,
-  o.Q4_ACV - (w.WALKIN_ACV + c.Q4_CREATED_ACV - z.WON_ACV - z.LOST_ACV) AS Q4_OTHER_ADJ_ACV
+  o.Q4_ACV - (w.WALKIN_ACV + c.Q4_CREATED_ACV - z.WON_ACV - z.LOST_ACV) AS Q4_OTHER_ADJ_ACV,
+  -- Month creation pace (ROTB marketing chrome without MQL feed)
+  ({Q4_GOAL}/3.0)::FLOAT AS MONTH_GOAL,
+  LEAST(1, GREATEST(0, DAY(CURRENT_DATE()) / DAY(LAST_DAY(CURRENT_DATE())))) AS MONTH_ELAPSED,
+  IFF({Q4_GOAL}/3.0 > 0, c.MONTH_ACV / ({Q4_GOAL}/3.0), 0) AS MONTH_PCT_GOAL
 FROM open_acv o
 CROSS JOIN created c
 CROSS JOIN closed z
@@ -386,6 +390,7 @@ SELECT 'PROD', a.DIM, 'Actual', a.ACTUAL, NULL FROM prod_act a
         ("PACK_WALKIN_OPPS", None), ("PACK_WALKIN_ACV", m()),
         ("Q4_COVERAGE", p()), ("YEAR_COVERAGE", p()),
         ("OTHER_ADJ_ACV", m()), ("Q4_OTHER_ADJ_ACV", m()),
+        ("MONTH_GOAL", m()), ("MONTH_ELAPSED", p()), ("MONTH_PCT_GOAL", p()),
     ]
     src_kpi_cols = [
         ("MKT_ACV", m()), ("SALES_ACV", m()), ("SRC_TOTAL_ACV", m()),
