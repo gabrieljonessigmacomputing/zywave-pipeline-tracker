@@ -1,0 +1,283 @@
+#!/usr/bin/env python3
+"""Lean DM: few SQL grains, each meant to run ONCE in the workbook.
+
+Warehouse jobs explode when Sigma re-inlines custom SQL into every Sum()/table.
+Keep ≤6 SQL elements; workbook must not fan one grain into many Sum() viz.
+"""
+from __future__ import annotations
+
+import json
+import os
+import urllib.error
+import urllib.request
+
+CONN = "e2b90d0c-34fd-4423-a4c3-0569c58f33df"
+FOLDER = "5EFLG4WW7cjvngI0kCudpF"
+DM = "e9511cff-4ab8-48c4-96e0-fbf2b3b96f10"
+YEAR_GOAL, Q4_GOAL = 94_600_000, 26_700_000
+OUT = "/tmp/zywave-pt-dm.json"
+
+
+def api(method, path, body=None):
+    base = os.environ.get("SIGMA_BASE_URL") or os.environ["ZYWAVE_BASE_URL"]
+    token = os.environ.get("SIGMA_API_TOKEN") or os.environ["ZYWAVE_API_TOKEN"]
+    data = None if body is None else json.dumps(body).encode()
+    req = urllib.request.Request(
+        f"{base}{path}", data=data, method=method,
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json", "Accept": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=300) as r:
+            raw = r.read()
+            return json.loads(raw) if raw else {}
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"{e.code}: {e.read().decode()[:12000]}") from e
+
+
+def money():
+    return {"kind": "number", "formatString": "$,.0f"}
+
+
+def pct():
+    return {"kind": "number", "formatString": ".1%"}
+
+
+def sql_table(tid, name, statement, cols):
+    columns = []
+    for i, (cname, fmt) in enumerate(cols):
+        c = {"id": f"{tid}-{i}", "name": cname, "formula": f"[Custom SQL/{cname}]"}
+        if fmt:
+            c["format"] = fmt
+        columns.append(c)
+    return {
+        "id": tid, "kind": "table", "name": name,
+        "source": {"kind": "sql", "connectionId": CONN, "statement": statement.strip()},
+        "columns": columns,
+    }
+
+
+def build():
+    m, p = money, pct
+
+    # 1) Pack — ACV metrics only (2 filtered scans, 1 result row)
+    pack = f"""
+WITH open_acv AS (
+  SELECT
+    COUNT(DISTINCT OPPORTUNITY_ID) AS TOTAL_OPPS,
+    COALESCE(SUM(METRIC_VALUE),0) AS TOTAL_ACV,
+    COUNT(DISTINCT IFF(CLOSE_DATE >= '2026-10-01' AND CLOSE_DATE < '2027-01-01', OPPORTUNITY_ID, NULL)) AS Q4_OPPS,
+    COALESCE(SUM(IFF(CLOSE_DATE >= '2026-10-01' AND CLOSE_DATE < '2027-01-01', METRIC_VALUE, 0)),0) AS Q4_ACV,
+    COUNT(DISTINCT IFF(CLOSE_DATE >= '2027-01-01' AND CLOSE_DATE < '2027-04-01', OPPORTUNITY_ID, NULL)) AS NQ_OPPS,
+    COALESCE(SUM(IFF(CLOSE_DATE >= '2027-01-01' AND CLOSE_DATE < '2027-04-01', METRIC_VALUE, 0)),0) AS NQ_ACV,
+    COUNT(DISTINCT IFF(CLOSE_DATE >= '2027-04-01' AND CLOSE_DATE < '2027-07-01', OPPORTUNITY_ID, NULL)) AS Q2OUT_OPPS,
+    COALESCE(SUM(IFF(CLOSE_DATE >= '2027-04-01' AND CLOSE_DATE < '2027-07-01', METRIC_VALUE, 0)),0) AS Q2OUT_ACV,
+    COALESCE(SUM(IFF(YEAR(CLOSE_DATE)=2026, METRIC_VALUE, 0)),0) AS CLOSE_CY_ACV,
+    COALESCE(SUM(IFF(YEAR(CLOSE_DATE)=2027, METRIC_VALUE, 0)),0) AS CLOSE_NY_ACV,
+    COALESCE(SUM(IFF(YEAR(CLOSE_DATE)>=2028, METRIC_VALUE, 0)),0) AS CLOSE_FY_ACV,
+    IFF(COUNT(DISTINCT OPPORTUNITY_ID)>0,
+      COALESCE(SUM(METRIC_VALUE),0)/COUNT(DISTINCT OPPORTUNITY_ID), 0) AS AVG_DEAL
+  FROM BI_STAGING.DATA.OPPORTUNITY_ACV_METRICS
+  WHERE METRIC_NAME = 'Forecasted Net ACV' AND STAGE_GROUP = '2-7'
+),
+created AS (
+  SELECT
+    COALESCE(SUM(IFF(STAGE_2_DATETIME >= '2026-01-01' AND STAGE_2_DATETIME < '2027-01-01', METRIC_VALUE, 0)),0) AS YTD_ACV,
+    COALESCE(SUM(IFF(STAGE_2_DATETIME >= '2026-10-01' AND STAGE_2_DATETIME < '2027-01-01', METRIC_VALUE, 0)),0) AS Q4_CREATED_ACV,
+    COUNT(DISTINCT IFF(STAGE_2_DATETIME >= '2026-10-01' AND STAGE_2_DATETIME < '2027-01-01', OPPORTUNITY_ID, NULL)) AS Q4_CREATED_OPPS,
+    COALESCE(SUM(IFF(STAGE_2_DATETIME >= DATE_TRUNC('month', CURRENT_DATE()), METRIC_VALUE, 0)),0) AS MONTH_ACV,
+    COUNT(DISTINCT IFF(STAGE_2_DATETIME >= DATE_TRUNC('month', CURRENT_DATE()), OPPORTUNITY_ID, NULL)) AS MONTH_OPPS,
+    COALESCE(SUM(IFF(STAGE_2_DATETIME >= DATEADD(day,-7,CURRENT_DATE()), METRIC_VALUE, 0)),0) AS WEEK_ACV,
+    COUNT(DISTINCT IFF(STAGE_2_DATETIME >= DATEADD(day,-7,CURRENT_DATE()), OPPORTUNITY_ID, NULL)) AS WEEK_OPPS,
+    COALESCE(SUM(IFF(
+      STAGE_2_DATETIME >= '2026-10-01' AND STAGE_2_DATETIME < '2027-01-01'
+      AND CLOSE_DATE >= '2026-10-01' AND CLOSE_DATE < '2027-01-01', METRIC_VALUE, 0)),0) AS CREATED_CLOSING_ACV,
+    COUNT(DISTINCT IFF(
+      STAGE_2_DATETIME >= '2026-10-01' AND STAGE_2_DATETIME < '2027-01-01'
+      AND CLOSE_DATE >= '2026-10-01' AND CLOSE_DATE < '2027-01-01', OPPORTUNITY_ID, NULL)) AS CREATED_CLOSING_OPPS
+  FROM BI_STAGING.DATA.OPPORTUNITY_ACV_METRICS
+  WHERE METRIC_NAME = 'Forecasted Net ACV' AND STAGE_2_ATTAINED = TRUE
+    AND STAGE_2_DATETIME >= '2025-10-01'
+)
+SELECT o.*, c.*,
+  {YEAR_GOAL}::FLOAT AS YEAR_GOAL, {Q4_GOAL}::FLOAT AS Q4_GOAL,
+  LEAST(1, DATEDIFF(day,'2026-01-01',CURRENT_DATE())/365.0) AS YEAR_ELAPSED,
+  LEAST(1, GREATEST(0, DATEDIFF(day,'2026-10-01',CURRENT_DATE())/92.0)) AS Q4_ELAPSED,
+  c.YTD_ACV/{YEAR_GOAL} AS YEAR_PCT_GOAL,
+  c.Q4_CREATED_ACV/{Q4_GOAL} AS Q4_PCT_GOAL
+FROM open_acv o CROSS JOIN created c
+"""
+
+    # 2) Walk-in — tiny snapshot (date-partitioned)
+    walkin = """
+SELECT COUNT(*) AS WALKIN_OPPS, COALESCE(SUM(v),0) AS WALKIN_ACV FROM (
+  SELECT OPPORTUNITYID, MAX(FCST_NETACV) AS v
+  FROM BI_STAGING.SNAPSHOT.VW_PIPELINE
+  WHERE SNAPSHOTDATE = '2026-10-01'
+    AND LEFT(STAGE_NAME,1) IN ('2','3','4','5','6','7')
+    AND CLOSE_DATE >= '2026-10-01' AND CLOSE_DATE < '2027-01-01'
+  GROUP BY 1 HAVING MAX(FCST_NETACV) BETWEEN 0 AND 2000000
+)"""
+
+    # 3) ONE VW_PIPELINE scan → closed + sourcing + early KPIs
+    vw = """
+SELECT
+  COALESCE(SUM(IFF("Is Closed" AND "Is Won"
+    AND "Close Date" >= '2026-10-01' AND "Close Date" < '2027-01-01', NETACV__C, 0)),0) AS WON_ACV,
+  COUNT(DISTINCT IFF("Is Closed" AND "Is Won"
+    AND "Close Date" >= '2026-10-01' AND "Close Date" < '2027-01-01', ID, NULL)) AS WON_OPPS,
+  COALESCE(SUM(IFF("Is Closed" AND NOT "Is Won"
+    AND "Close Date" >= '2026-10-01' AND "Close Date" < '2027-01-01'
+    AND NETACV__C BETWEEN 0 AND 50000, NETACV__C, 0)),0) AS LOST_ACV,
+  COUNT(DISTINCT IFF("Is Closed" AND NOT "Is Won"
+    AND "Close Date" >= '2026-10-01' AND "Close Date" < '2027-01-01'
+    AND NETACV__C BETWEEN 0 AND 50000, ID, NULL)) AS LOST_OPPS,
+  COALESCE(SUM(IFF(NOT "Is Closed" AND LEFT("Stage Name",1) IN ('2','3','4','5','6','7')
+    AND "Lead Source"='Marketing' AND FCST_NETACV BETWEEN 0 AND 5000000, FCST_NETACV, 0)),0) AS MKT_ACV,
+  COALESCE(SUM(IFF(NOT "Is Closed" AND LEFT("Stage Name",1) IN ('2','3','4','5','6','7')
+    AND "Lead Source"='Sales Generated' AND FCST_NETACV BETWEEN 0 AND 5000000, FCST_NETACV, 0)),0) AS SALES_ACV,
+  COUNT(DISTINCT IFF(NOT "Is Closed" AND LEFT("Stage Name",1)='0', ID, NULL)) AS S0_OPPS,
+  COALESCE(SUM(IFF(NOT "Is Closed" AND LEFT("Stage Name",1)='0'
+    AND FCST_NETACV BETWEEN 0 AND 5000000, FCST_NETACV, 0)),0) AS S0_ACV,
+  COUNT(DISTINCT IFF(NOT "Is Closed" AND LEFT("Stage Name",1)='1', ID, NULL)) AS S1_OPPS,
+  COALESCE(SUM(IFF(NOT "Is Closed" AND LEFT("Stage Name",1)='1'
+    AND FCST_NETACV BETWEEN 0 AND 5000000, FCST_NETACV, 0)),0) AS S1_ACV,
+  COUNT(DISTINCT IFF(NOT "Is Closed" AND LEFT("Stage Name",1)='2', ID, NULL)) AS S2_OPPS,
+  COALESCE(SUM(IFF(NOT "Is Closed" AND LEFT("Stage Name",1)='2'
+    AND FCST_NETACV BETWEEN 0 AND 5000000, FCST_NETACV, 0)),0) AS S2_ACV
+FROM BI_PRESENTATION.REPORT.VW_PIPELINE
+WHERE
+  ("Is Closed" AND "Close Date" >= '2026-10-01' AND "Close Date" < '2027-01-01')
+  OR (NOT "Is Closed" AND LEFT("Stage Name",1) IN ('0','1','2','3','4','5','6','7'))
+"""
+
+    # 4) Funnel — Q4 open stages only (ACV metrics)
+    funnel = """
+SELECT STAGE,
+  CASE STAGE
+    WHEN '2 - Analysis' THEN 2 WHEN '3 - Executive Alignment' THEN 3
+    WHEN '4 - Solution Validation' THEN 4 WHEN '5 - Negotiate' THEN 5
+    WHEN '6 - Finance Hold' THEN 6 WHEN '7 - Finance Review' THEN 7 ELSE 99 END AS ORD,
+  COALESCE(SUM(METRIC_VALUE),0) AS ACV
+FROM BI_STAGING.DATA.OPPORTUNITY_ACV_METRICS
+WHERE METRIC_NAME='Forecasted Net ACV' AND STAGE_GROUP='2-7'
+  AND CLOSE_DATE >= '2026-10-01' AND CLOSE_DATE < '2027-01-01'
+GROUP BY 1,2
+"""
+
+    # 5) Created by month — short window
+    created_month = """
+SELECT DATE_TRUNC('month', STAGE_2_DATETIME) AS MONTH, COALESCE(SUM(METRIC_VALUE),0) AS ACV
+FROM BI_STAGING.DATA.OPPORTUNITY_ACV_METRICS
+WHERE METRIC_NAME='Forecasted Net ACV' AND STAGE_2_ATTAINED
+  AND STAGE_2_DATETIME >= '2025-10-01'
+GROUP BY 1
+"""
+
+    # 6) ONE VW open scan → segment + product + source chart rows
+    charts = """
+WITH open_rows AS (
+  SELECT
+    CASE
+      WHEN CONTAINS("Segment",'Core') THEN 'Core'
+      WHEN CONTAINS("Segment",'Mid') OR "Segment"='MM' THEN 'Mid-Market'
+      WHEN CONTAINS("Segment",'Enterprise') OR CONTAINS("Segment",'Up-Market') THEN 'Enterprise'
+      ELSE 'Other'
+    END AS SEG,
+    CASE
+      WHEN CONTAINS("Product Category",'Analytics') OR CONTAINS("Product Category",'Marketing')
+        OR CONTAINS("Product Category",'Client') OR CONTAINS("Product Category",'Content')
+        THEN 'Insurance Intelligence'
+      WHEN CONTAINS("Product Category",'RQC') OR CONTAINS("Product Category",'AMS')
+        OR CONTAINS("Product Category",'Service') THEN 'RQC & AMS'
+      ELSE 'Platform Sales'
+    END AS PGRP,
+    CASE WHEN "Lead Source"='Marketing' THEN 'Marketing'
+         WHEN "Lead Source"='Sales Generated' THEN 'Sales' ELSE 'Other' END AS SRC,
+    CASE WHEN FCST_NETACV BETWEEN 0 AND 5000000 THEN FCST_NETACV ELSE 0 END AS ACV,
+    ID
+  FROM BI_PRESENTATION.REPORT.VW_PIPELINE
+  WHERE NOT "Is Closed" AND LEFT("Stage Name",1) IN ('2','3','4','5','6','7')
+),
+seg_act AS (
+  SELECT SEG AS DIM, COALESCE(SUM(ACV),0) AS ACTUAL FROM open_rows WHERE SEG <> 'Other' GROUP BY 1
+),
+prod_act AS (
+  SELECT PGRP AS DIM, COALESCE(SUM(ACV),0) AS ACTUAL FROM open_rows GROUP BY 1
+),
+src_act AS (
+  SELECT SRC AS DIM, COUNT(DISTINCT ID) AS OPPS, COALESCE(SUM(ACV),0) AS ACTUAL FROM open_rows GROUP BY 1
+)
+SELECT 'SEG' AS GRAIN, t.DIM, 'Target' AS SERIES, t.TARGET AS VAL, NULL::FLOAT AS OPPS
+FROM (
+  SELECT 'Core' AS DIM, 18000000::FLOAT AS TARGET
+  UNION ALL SELECT 'Mid-Market', 16000000
+  UNION ALL SELECT 'Enterprise', 20000000
+) t
+UNION ALL
+SELECT 'SEG', a.DIM, 'Actual', a.ACTUAL, NULL FROM seg_act a
+UNION ALL
+SELECT 'PROD', t.DIM, 'Target', t.TARGET, NULL FROM (
+  SELECT 'Insurance Intelligence' AS DIM, 31000000::FLOAT AS TARGET
+  UNION ALL SELECT 'RQC & AMS', 22000000
+  UNION ALL SELECT 'Platform Sales', 1000000
+) t
+UNION ALL
+SELECT 'PROD', a.DIM, 'Actual', a.ACTUAL, NULL FROM prod_act a
+UNION ALL
+SELECT 'SRC', a.DIM, 'Actual', a.ACTUAL, a.OPPS::FLOAT FROM src_act a
+"""
+
+    pack_cols = [
+        ("TOTAL_OPPS", None), ("TOTAL_ACV", m()), ("Q4_OPPS", None), ("Q4_ACV", m()),
+        ("NQ_OPPS", None), ("NQ_ACV", m()), ("Q2OUT_OPPS", None), ("Q2OUT_ACV", m()),
+        ("CLOSE_CY_ACV", m()), ("CLOSE_NY_ACV", m()), ("CLOSE_FY_ACV", m()), ("AVG_DEAL", m()),
+        ("YTD_ACV", m()), ("Q4_CREATED_ACV", m()), ("Q4_CREATED_OPPS", None),
+        ("MONTH_ACV", m()), ("MONTH_OPPS", None),
+        ("WEEK_ACV", m()), ("WEEK_OPPS", None),
+        ("CREATED_CLOSING_ACV", m()), ("CREATED_CLOSING_OPPS", None),
+        ("YEAR_GOAL", m()), ("Q4_GOAL", m()),
+        ("YEAR_ELAPSED", p()), ("Q4_ELAPSED", p()),
+        ("YEAR_PCT_GOAL", p()), ("Q4_PCT_GOAL", p()),
+    ]
+    vw_cols = [
+        ("WON_ACV", m()), ("WON_OPPS", None), ("LOST_ACV", m()), ("LOST_OPPS", None),
+        ("MKT_ACV", m()), ("SALES_ACV", m()),
+        ("S0_OPPS", None), ("S0_ACV", m()), ("S1_OPPS", None), ("S1_ACV", m()),
+        ("S2_OPPS", None), ("S2_ACV", m()),
+    ]
+    return [
+        sql_table("kpi-pack", "KPI Pack", pack, pack_cols),
+        sql_table("kpi-walkin", "KPI Walkin", walkin, [("WALKIN_OPPS", None), ("WALKIN_ACV", m())]),
+        sql_table("kpi-vw", "KPI VW Bundle", vw, vw_cols),
+        sql_table("chart-funnel", "Chart Funnel", funnel, [
+            ("STAGE", None), ("ORD", None), ("ACV", m())]),
+        sql_table("chart-created", "Chart Created", created_month, [
+            ("MONTH", {"kind": "datetime", "formatString": "%b %Y"}), ("ACV", m())]),
+        sql_table("chart-tv", "Chart Target Actual Source", charts, [
+            ("GRAIN", None), ("DIM", None), ("SERIES", None), ("VAL", m()), ("OPPS", None)]),
+    ]
+
+
+def main():
+    els = build()
+    body = {
+        "name": "Pipeline Tracker FY2026 · Model",
+        "folderId": FOLDER,
+        "schemaVersion": 1,
+        "pages": [{"id": "page-main", "name": "Sources", "elements": els}],
+    }
+    print("elements", len(els), "chars", sum(len(e["source"]["statement"]) for e in els))
+    print("PUT", api("PUT", f"/v2/dataModels/{DM}/spec", body))
+    spec = api("GET", f"/v2/dataModels/{DM}/spec")
+    by = {}
+    for p in spec.get("pages", []):
+        for e in p.get("elements", []):
+            if isinstance(e, dict):
+                by[e.get("name")] = e.get("id")
+    out = {"dataModelId": DM, "byName": by}
+    json.dump(out, open(OUT, "w"), indent=2)
+    print(json.dumps(out, indent=2))
+
+
+if __name__ == "__main__":
+    main()

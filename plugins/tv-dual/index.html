@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Target vs Actual dual bars</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;background:transparent;
+    font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:#0f172a;-webkit-font-smoothing:antialiased}
+  #root{box-sizing:border-box;width:100%;height:100%;padding:8px 10px;
+    display:grid;grid-template-columns:1fr 1fr;gap:16px;min-width:0;min-height:0}
+  .panel{display:flex;flex-direction:column;min-width:0;min-height:0}
+  .title{font-size:13px;font-weight:600;color:#0f172a;margin:0 0 8px;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
+  .chart{flex:1;min-height:0;position:relative}
+  svg{display:block;width:100%;height:100%}
+  .axis{font-size:11px;fill:#64748b}
+  .lbl{font-size:11px;fill:#334155}
+  .legend{display:flex;gap:12px;margin-top:4px;font-size:11px;color:#64748b}
+  .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/@sigmacomputing/plugin"></script>
+<script>
+(function () {
+  "use strict";
+  var root = document.getElementById("root");
+  var BLUE = "#2563eb", GREEN = "#16a34a";
+
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function money(v) {
+    v = Number(v) || 0;
+    if (v === 0) return "$0";
+    var units = [[1e12, "T"], [1e9, "B"], [1e6, "M"], [1e3, "K"]], a = Math.abs(v);
+    for (var i = 0; i < units.length; i++) {
+      if (a >= units[i][0]) {
+        var s = v / units[i][0];
+        return "$" + (Math.abs(s) >= 100 ? String(Math.round(s)) : s.toPrecision(2)) + units[i][1];
+      }
+    }
+    return "$" + (a >= 100 ? String(Math.round(v)) : Number(v.toPrecision(2)).toString());
+  }
+
+  function groupRows(rows, grain) {
+    var map = {}, order = [];
+    rows.forEach(function (r) {
+      if (r.grain !== grain) return;
+      if (!map[r.dim]) { map[r.dim] = { dim: r.dim, Target: 0, Actual: 0 }; order.push(r.dim); }
+      if (r.series === "Target") map[r.dim].Target = r.val;
+      else if (r.series === "Actual") map[r.dim].Actual = r.val;
+    });
+    return order.map(function (d) { return map[d]; });
+  }
+
+  function drawPanel(el, title, cats) {
+    var W = el.clientWidth || 280, H = el.clientHeight || 220;
+    if (W < 40 || H < 40) { el.innerHTML = ""; return; }
+    var padL = 36, padR = 8, padT = 8, padB = 36;
+    var iw = W - padL - padR, ih = H - padT - padB;
+    var maxV = 1;
+    cats.forEach(function (c) { maxV = Math.max(maxV, c.Target || 0, c.Actual || 0); });
+    var n = Math.max(1, cats.length);
+    var groupW = iw / n, barW = Math.max(6, Math.min(22, groupW * 0.28));
+    var gap = 4;
+
+    var s = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H +
+            '" viewBox="0 0 ' + W + ' ' + H + '">';
+    s += '<line x1="' + padL + '" y1="' + (padT + ih) + '" x2="' + (padL + iw) + '" y2="' +
+         (padT + ih) + '" stroke="#e2e8f0"/>';
+    for (var t = 0; t <= 3; t++) {
+      var y = padT + ih - (ih * t / 3);
+      s += '<text class="axis" x="' + (padL - 4) + '" y="' + (y + 3) + '" text-anchor="end">' +
+           esc(money(maxV * t / 3)) + '</text>';
+      if (t) s += '<line x1="' + padL + '" y1="' + y + '" x2="' + (padL + iw) + '" y2="' + y +
+                  '" stroke="#f1f5f9"/>';
+    }
+    for (var i = 0; i < cats.length; i++) {
+      var c = cats[i];
+      var cx = padL + groupW * (i + 0.5);
+      var hT = ih * ((c.Target || 0) / maxV), hA = ih * ((c.Actual || 0) / maxV);
+      var xT = cx - barW - gap / 2, xA = cx + gap / 2;
+      s += '<rect x="' + xT + '" y="' + (padT + ih - hT) + '" width="' + barW + '" height="' + hT +
+           '" fill="' + BLUE + '" rx="2"><title>Target: ' + esc(money(c.Target)) + '</title></rect>';
+      s += '<rect x="' + xA + '" y="' + (padT + ih - hA) + '" width="' + barW + '" height="' + hA +
+           '" fill="' + GREEN + '" rx="2"><title>Actual: ' + esc(money(c.Actual)) + '</title></rect>';
+      var label = String(c.dim || "");
+      if (label.length > 14) label = label.slice(0, 12) + "…";
+      s += '<text class="lbl" x="' + cx + '" y="' + (padT + ih + 14) + '" text-anchor="middle">' +
+           esc(label) + '</text>';
+    }
+    s += '</svg>';
+    el.innerHTML = '<div class="title">' + esc(title) + '</div><div class="chart">' + s +
+      '</div><div class="legend"><span><span class="sw" style="background:' + BLUE +
+      '"></span>Target</span><span><span class="sw" style="background:' + GREEN +
+      '"></span>Actual</span></div>';
+  }
+
+  function synth() {
+    return [
+      { grain: "SEG", dim: "Core", series: "Target", val: 18000000 },
+      { grain: "SEG", dim: "Core", series: "Actual", val: 12000000 },
+      { grain: "SEG", dim: "Mid-Market", series: "Target", val: 16000000 },
+      { grain: "SEG", dim: "Mid-Market", series: "Actual", val: 9000000 },
+      { grain: "SEG", dim: "Enterprise", series: "Target", val: 20000000 },
+      { grain: "SEG", dim: "Enterprise", series: "Actual", val: 14000000 },
+      { grain: "PROD", dim: "Insurance Intelligence", series: "Target", val: 31000000 },
+      { grain: "PROD", dim: "Insurance Intelligence", series: "Actual", val: 22000000 },
+      { grain: "PROD", dim: "RQC & AMS", series: "Target", val: 22000000 },
+      { grain: "PROD", dim: "RQC & AMS", series: "Actual", val: 15000000 },
+      { grain: "PROD", dim: "Platform Sales", series: "Target", val: 1000000 },
+      { grain: "PROD", dim: "Platform Sales", series: "Actual", val: 800000 },
+    ];
+  }
+
+  var LAST = synth();
+
+  function render(rows) {
+    LAST = rows || LAST;
+    root.innerHTML =
+      '<div class="panel" id="p-seg"></div><div class="panel" id="p-prod"></div>';
+    drawPanel(document.getElementById("p-seg"), "Pipeline by Segment: 2H Target vs Actual",
+              groupRows(LAST, "SEG"));
+    drawPanel(document.getElementById("p-prod"), "Pipeline by Product Group: 2H Target vs Actual",
+              groupRows(LAST, "PROD"));
+  }
+
+  var client = window.sigmaComputing && window.sigmaComputing.plugin
+             ? window.sigmaComputing.plugin.client : null;
+
+  if (!client) { render(LAST); }
+  else {
+    client.config.configureEditorPanel([
+      { name: "source", type: "element" },
+      { name: "grain", type: "column", source: "source", allowedTypes: ["text"], label: "Grain" },
+      { name: "dim", type: "column", source: "source", allowedTypes: ["text"], label: "Dimension" },
+      { name: "series", type: "column", source: "source", allowedTypes: ["text"], label: "Series" },
+      { name: "val", type: "column", source: "source", allowedTypes: ["number"], label: "Value" }
+    ]);
+    var unsub = null;
+    client.config.subscribe(function (cfg) {
+      if (unsub) { unsub(); unsub = null; }
+      if (!cfg || !cfg.source || !cfg.grain || !cfg.dim || !cfg.series || !cfg.val) {
+        render(synth()); return;
+      }
+      unsub = client.elements.subscribeToElementData(cfg.source, function (data) {
+        var g = data && data[cfg.grain], d = data && data[cfg.dim];
+        var s = data && data[cfg.series], v = data && data[cfg.val];
+        if (!g || !d || !s || !v || !g.length) { render(synth()); return; }
+        var rows = [];
+        for (var i = 0; i < g.length; i++) {
+          rows.push({
+            grain: String(g[i] == null ? "" : g[i]),
+            dim: String(d[i] == null ? "" : d[i]),
+            series: String(s[i] == null ? "" : s[i]),
+            val: Math.max(0, Number(v[i]) || 0),
+          });
+        }
+        render(rows);
+      });
+    });
+  }
+
+  if (window.ResizeObserver) new ResizeObserver(function () { render(LAST); }).observe(root);
+  else window.addEventListener("resize", function () { render(LAST); });
+})();
+</script>
+</body>
+</html>

@@ -4,12 +4,23 @@ Two single-file, vanilla-JS Sigma plugins (no build step). Each loads `@sigmacom
 
 ## Hosting (GitHub Pages)
 
-Register these URLs in Sigma (Administration → Account → Custom plugins):
+Production URLs (already deployed):
 
 - pace-bullet: https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/pace-bullet/
 - stage-funnel: https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/stage-funnel/
 
-Both show demo data until a source element is bound.
+Register (or refresh) with Zywave Sigma via API:
+
+```bash
+set -a; source ~/.zywave/sigma-zywave.env; set +a
+export SIGMA_BASE_URL="$ZYWAVE_BASE_URL"
+# … exchange token …
+python3 scripts/register_plugins.py   # writes plugins/plugin-ids.json
+```
+
+Ids are stored in `plugin-ids.json` and consumed by `build_workbook_once.py`.
+
+Both show demo data in the editor until a source element is bound.
 
 ## pace-bullet
 
