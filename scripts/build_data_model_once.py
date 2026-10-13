@@ -121,36 +121,46 @@ SELECT COUNT(*) AS WALKIN_OPPS, COALESCE(SUM(v),0) AS WALKIN_ACV FROM (
   GROUP BY 1 HAVING MAX(FCST_NETACV) BETWEEN 0 AND 2000000
 )"""
 
-    # 3) ONE VW_PIPELINE scan → closed + sourcing + early KPIs
-    vw = """
+    # 3a) Closed Q4 only — tiny date-filtered slice (was drowning in the mega VW OR)
+    closed = """
 SELECT
-  COALESCE(SUM(IFF("Is Closed" AND "Is Won"
-    AND "Close Date" >= '2026-10-01' AND "Close Date" < '2027-01-01', NETACV__C, 0)),0) AS WON_ACV,
-  COUNT(DISTINCT IFF("Is Closed" AND "Is Won"
-    AND "Close Date" >= '2026-10-01' AND "Close Date" < '2027-01-01', ID, NULL)) AS WON_OPPS,
-  COALESCE(SUM(IFF("Is Closed" AND NOT "Is Won"
-    AND "Close Date" >= '2026-10-01' AND "Close Date" < '2027-01-01'
-    AND NETACV__C BETWEEN 0 AND 50000, NETACV__C, 0)),0) AS LOST_ACV,
-  COUNT(DISTINCT IFF("Is Closed" AND NOT "Is Won"
-    AND "Close Date" >= '2026-10-01' AND "Close Date" < '2027-01-01'
-    AND NETACV__C BETWEEN 0 AND 50000, ID, NULL)) AS LOST_OPPS,
-  COALESCE(SUM(IFF(NOT "Is Closed" AND LEFT("Stage Name",1) IN ('2','3','4','5','6','7')
+  COALESCE(SUM(IFF("Is Won", NETACV__C, 0)),0) AS WON_ACV,
+  COUNT(DISTINCT IFF("Is Won", ID, NULL)) AS WON_OPPS,
+  COALESCE(SUM(IFF(NOT "Is Won" AND NETACV__C BETWEEN 0 AND 50000, NETACV__C, 0)),0) AS LOST_ACV,
+  COUNT(DISTINCT IFF(NOT "Is Won" AND NETACV__C BETWEEN 0 AND 50000, ID, NULL)) AS LOST_OPPS
+FROM BI_PRESENTATION.REPORT.VW_PIPELINE
+WHERE "Is Closed"
+  AND "Close Date" >= '2026-10-01' AND "Close Date" < '2027-01-01'
+"""
+
+    # 3b) Open only — sourcing + early stage (no closed rows in the scan)
+    open_vw = """
+SELECT
+  COALESCE(SUM(IFF(LEFT("Stage Name",1) IN ('2','3','4','5','6','7')
     AND "Lead Source"='Marketing' AND FCST_NETACV BETWEEN 0 AND 5000000, FCST_NETACV, 0)),0) AS MKT_ACV,
-  COALESCE(SUM(IFF(NOT "Is Closed" AND LEFT("Stage Name",1) IN ('2','3','4','5','6','7')
+  COALESCE(SUM(IFF(LEFT("Stage Name",1) IN ('2','3','4','5','6','7')
     AND "Lead Source"='Sales Generated' AND FCST_NETACV BETWEEN 0 AND 5000000, FCST_NETACV, 0)),0) AS SALES_ACV,
-  COUNT(DISTINCT IFF(NOT "Is Closed" AND LEFT("Stage Name",1)='0', ID, NULL)) AS S0_OPPS,
-  COALESCE(SUM(IFF(NOT "Is Closed" AND LEFT("Stage Name",1)='0'
+  COUNT(DISTINCT IFF(LEFT("Stage Name",1)='0', ID, NULL)) AS S0_OPPS,
+  COALESCE(SUM(IFF(LEFT("Stage Name",1)='0'
     AND FCST_NETACV BETWEEN 0 AND 5000000, FCST_NETACV, 0)),0) AS S0_ACV,
-  COUNT(DISTINCT IFF(NOT "Is Closed" AND LEFT("Stage Name",1)='1', ID, NULL)) AS S1_OPPS,
-  COALESCE(SUM(IFF(NOT "Is Closed" AND LEFT("Stage Name",1)='1'
+  COUNT(DISTINCT IFF(LEFT("Stage Name",1)='1', ID, NULL)) AS S1_OPPS,
+  COALESCE(SUM(IFF(LEFT("Stage Name",1)='1'
     AND FCST_NETACV BETWEEN 0 AND 5000000, FCST_NETACV, 0)),0) AS S1_ACV,
-  COUNT(DISTINCT IFF(NOT "Is Closed" AND LEFT("Stage Name",1)='2', ID, NULL)) AS S2_OPPS,
-  COALESCE(SUM(IFF(NOT "Is Closed" AND LEFT("Stage Name",1)='2'
+  COUNT(DISTINCT IFF(LEFT("Stage Name",1)='2', ID, NULL)) AS S2_OPPS,
+  COALESCE(SUM(IFF(LEFT("Stage Name",1)='2'
     AND FCST_NETACV BETWEEN 0 AND 5000000, FCST_NETACV, 0)),0) AS S2_ACV
 FROM BI_PRESENTATION.REPORT.VW_PIPELINE
-WHERE
-  ("Is Closed" AND "Close Date" >= '2026-10-01' AND "Close Date" < '2027-01-01')
-  OR (NOT "Is Closed" AND LEFT("Stage Name",1) IN ('0','1','2','3','4','5','6','7'))
+WHERE NOT "Is Closed" AND LEFT("Stage Name",1) IN ('0','1','2','3','4','5','6','7')
+"""
+    open_vw = f"""
+WITH b AS (
+{open_vw.strip()}
+)
+SELECT b.*,
+  b.MKT_ACV + b.SALES_ACV AS SRC_TOTAL_ACV,
+  IFF(b.MKT_ACV + b.SALES_ACV > 0, b.MKT_ACV/(b.MKT_ACV + b.SALES_ACV), 0) AS MKT_MIX,
+  IFF(b.MKT_ACV + b.SALES_ACV > 0, b.SALES_ACV/(b.MKT_ACV + b.SALES_ACV), 0) AS SALES_MIX
+FROM b
 """
 
     # 4) Funnel — Q4 open stages only (ACV metrics)
@@ -243,13 +253,16 @@ SELECT 'SRC', a.DIM, 'Actual', a.ACTUAL, a.OPPS::FLOAT FROM src_act a
         ("YEAR_PCT_GOAL", p()), ("Q4_PCT_GOAL", p()),
         ("CLOSE_CY_PCT", p()), ("CLOSE_NY_PCT", p()), ("CLOSE_FY_PCT", p()),
     ]
-    vw_cols = [
+    closed_cols = [
         ("WON_ACV", m()), ("WON_OPPS", None), ("LOST_ACV", m()), ("LOST_OPPS", None),
+    ]
+    open_cols = [
         ("MKT_ACV", m()), ("SALES_ACV", m()),
         ("S0_OPPS", None), ("S0_ACV", m()), ("S1_OPPS", None), ("S1_ACV", m()),
         ("S2_OPPS", None), ("S2_ACV", m()),
+        ("SRC_TOTAL_ACV", m()), ("MKT_MIX", p()), ("SALES_MIX", p()),
     ]
-    # 7) Daily open ACV trend — date-filtered snapshot (one job for Movement)
+    # Daily open ACV trend — date-filtered snapshot (one job for Movement)
     snap = """
 SELECT SNAPSHOTDATE AS DT, COALESCE(SUM(FCST_NETACV),0) AS ACV
 FROM BI_STAGING.SNAPSHOT.VW_PIPELINE
@@ -262,7 +275,8 @@ GROUP BY 1
     return [
         sql_table("kpi-pack", "KPI Pack", pack, pack_cols),
         sql_table("kpi-walkin", "KPI Walkin", walkin, [("WALKIN_OPPS", None), ("WALKIN_ACV", m())]),
-        sql_table("kpi-vw", "KPI VW Bundle", vw, vw_cols),
+        sql_table("kpi-closed", "KPI Closed Q4", closed, closed_cols),
+        sql_table("kpi-open-vw", "KPI Open VW", open_vw, open_cols),
         sql_table("chart-funnel", "Chart Funnel", funnel, [
             ("STAGE", None), ("ORD", None), ("ACV", m())]),
         sql_table("chart-created", "Chart Created", created_month, [
