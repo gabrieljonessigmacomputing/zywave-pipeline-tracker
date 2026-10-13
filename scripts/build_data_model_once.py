@@ -279,7 +279,9 @@ SELECT
   IFF(16000000 > 0,
     COALESCE(SUM(IFF(MKT_SEG = 'Mid-Market', ACV, 0)), 0) / 16000000, 0) AS MID_PCT_GOAL,
   IFF(20000000 > 0,
-    COALESCE(SUM(IFF(MKT_SEG = 'Enterprise', ACV, 0)), 0) / 20000000, 0) AS ENT_PCT_GOAL
+    COALESCE(SUM(IFF(MKT_SEG = 'Enterprise', ACV, 0)), 0) / 20000000, 0) AS ENT_PCT_GOAL,
+  -- Pace tick for NL/XS bars (Sourcing-only plugins)
+  LEAST(1, GREATEST(0, DATEDIFF(day,'2026-10-01',CURRENT_DATE())/92.0)) AS Q4_ELAPSED
 FROM tagged
 """
 
@@ -409,6 +411,7 @@ SELECT 'PROD', a.DIM, 'Actual', a.ACTUAL, NULL FROM prod_act a
         ("NL_TARGET", m()), ("XS_TARGET", m()),
         ("NL_PCT_GOAL", p()), ("XS_PCT_GOAL", p()),
         ("CORE_PCT_GOAL", p()), ("MID_PCT_GOAL", p()), ("ENT_PCT_GOAL", p()),
+        ("Q4_ELAPSED", p()),
     ]
     return [
         sql_table("kpi-pack", "KPI Pack", pack, pack_cols),

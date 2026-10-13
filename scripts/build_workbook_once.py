@@ -150,6 +150,7 @@ def build():
             ("NL_TARGET", m()), ("XS_TARGET", m()),
             ("NL_PCT_GOAL", p()), ("XS_PCT_GOAL", p()),
             ("CORE_PCT_GOAL", p()), ("MID_PCT_GOAL", p()), ("ENT_PCT_GOAL", p()),
+            ("Q4_ELAPSED", p()),
         ]),
         pass_tbl("wb-funnel", "WB Funnel", "chart-funnel", "Chart Funnel",
                  [("STAGE", None), ("ORD", None), ("ACV", m()), ("OPPS", None)]),
@@ -174,12 +175,12 @@ def build():
     def ref(table, col, fmt):
         return "{{" + f"[{table}/{col}] | {fmt}" + "}}"
 
-    def pace_plugin(eid, title, actual_col, goal_col, paced_col):
-        # Bind directly to wb-pack so pack SQL runs once (no child table re-inline).
+    def pace_plugin(eid, title, actual_col, goal_col, paced_col, src="wb-pack"):
+        # Bind to pack (hot) or wb-src (Sourcing-only) — never Sum()-fan custom SQL.
         return {
             "id": eid, "kind": "plugin", "pluginId": PACE_ID, "displayName": title,
             "config": {
-                "source": {"kind": "element", "elementId": "wb-pack"},
+                "source": {"kind": "element", "elementId": src},
                 "actual": {"kind": "column", "columnId": actual_col, "source": "source"},
                 "goal": {"kind": "column", "columnId": goal_col, "source": "source"},
                 "pacedPct": {"kind": "column", "columnId": paced_col, "source": "source"},
@@ -602,20 +603,19 @@ def build():
           f'<p class="p-small" style="text-align:center"><span style="color:{MUTED}">target M 39% / S 61%</span></p>'),
         C("sc-deal-row", SECTION, SECTION),
         C("sc-nl"), C("sc-xs"), C("sc-unc", "#f8fafc", BORDER),
+        # Pace bars bind wb-src (Sourcing-only VW grain) — NL/XS vs stills targets
+        pace_plugin("plugin-pace-nl", "New Logo open vs goal", "wb-src-15", "wb-src-23", "wb-src-30", src="wb-src"),
+        pace_plugin("plugin-pace-xs", "Cross-Sell open vs goal", "wb-src-18", "wb-src-24", "wb-src-30", src="wb-src"),
         T("sk-nl",
-          label("NEW LOGO") + "\n" +
-          hero(ref(S, "NL_ACV", "$,.2s"), BLUE, 28) + "\n" +
-          f'<p class="p-small"><span style="color:{GREEN}">{ref(S,"NL_PCT_GOAL",".1%")} of goal</span> · '
-          f'<span style="color:{MUTED}">target {ref(S,"NL_TARGET","$,.2s")}</span></p>\n'
+          label("NEW LOGO · MIX") + "\n" +
           f'<p class="p-small"><span style="color:{BLUE}">M {ref(S,"NL_MKT","$,.2s")}</span> · '
-          f'<span style="color:{ORANGE}">S {ref(S,"NL_SALES","$,.2s")}</span></p>'),
+          f'<span style="color:{ORANGE}">S {ref(S,"NL_SALES","$,.2s")}</span></p>\n'
+          f'<p class="p-small"><span style="color:{MUTED}">{ref(S,"NL_PCT_GOAL",".1%")} of goal</span></p>'),
         T("sk-xs",
-          label("CROSS-SELL / EXPANSION") + "\n" +
-          hero(ref(S, "XS_ACV", "$,.2s"), ORANGE, 28) + "\n" +
-          f'<p class="p-small"><span style="color:{GREEN}">{ref(S,"XS_PCT_GOAL",".1%")} of goal</span> · '
-          f'<span style="color:{MUTED}">target {ref(S,"XS_TARGET","$,.2s")}</span></p>\n'
+          label("CROSS-SELL · MIX") + "\n" +
           f'<p class="p-small"><span style="color:{BLUE}">M {ref(S,"XS_MKT","$,.2s")}</span> · '
-          f'<span style="color:{ORANGE}">S {ref(S,"XS_SALES","$,.2s")}</span></p>'),
+          f'<span style="color:{ORANGE}">S {ref(S,"XS_SALES","$,.2s")}</span></p>\n'
+          f'<p class="p-small"><span style="color:{MUTED}">{ref(S,"XS_PCT_GOAL",".1%")} of goal</span></p>'),
         T("sk-unc",
           label("UNCATEGORIZED DEAL TYPE") + "\n" +
           hero(ref(S, "UNC_ACV", "$,.2s"), MUTED, 28) + "\n" +
@@ -744,7 +744,7 @@ def build():
           label("CREATED & WON THIS Q") + "\n" +
           hero(ref(P, "CREATED_WON_ACV", "$,.2s"), GREEN, 28) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"CREATED_WON_OPPS",",.0f")} opps · pack</span></p>'),
-        T("bridge-h", f'## Pipeline Bridge — Q4 FY2026\n<span style="color:{MUTED}">Walk-in + Created − Won − Lost + Other Adj ≈ Open · pack grain</span>'),
+        T("bridge-h", f'## Pipeline Bridge — Q4 FY2026\n<span style="color:{MUTED}">Walk-in + Created − Won − Lost + Other Adj ≈ Total Open · pack grain</span>'),
         C("cc-start"), C("cc-cr", GREEN_BG, "#bbf7d0"), C("cc-won", GREEN_BG, "#bbf7d0"),
         C("cc-lost", RED_BG, "#fecaca"), C("cc-tot", "#eff6ff", "#93c5fd"),
         T("ck-start", label("WALK-IN (QTR START)") + "\n" + hero(ref(W, "WALKIN_ACV", "$,.2s"), BLUE, 22)),
@@ -1018,20 +1018,26 @@ Coverage / ABM = pack chrome (no open-VW). No daily snapshot grain.
             Cont("sc-t-card", 13, 19, 1, 10, [L("sk-t", 1, 25, 1, 2)], 2),
             Cont("sc-mix-card", 19, 25, 1, 10, [L("sk-mix", 1, 25, 1, 2)], 2),
         ]),
-        Cont("sc-deal-row", 1, 25, 15, 23, [
-            Cont("sc-nl", 1, 9, 1, 10, [L("sk-nl", 1, 25, 1, 2)], 2),
-            Cont("sc-xs", 9, 17, 1, 10, [L("sk-xs", 1, 25, 1, 2)], 2),
-            Cont("sc-unc", 17, 25, 1, 10, [L("sk-unc", 1, 25, 1, 2)], 2),
+        Cont("sc-deal-row", 1, 25, 15, 26, [
+            Cont("sc-nl", 1, 9, 1, 12, [
+                L("plugin-pace-nl", 1, 25, 1, 8),
+                L("sk-nl", 1, 25, 8, 12),
+            ], 2),
+            Cont("sc-xs", 9, 17, 1, 12, [
+                L("plugin-pace-xs", 1, 25, 1, 8),
+                L("sk-xs", 1, 25, 8, 12),
+            ], 2),
+            Cont("sc-unc", 17, 25, 1, 12, [L("sk-unc", 1, 25, 1, 2)], 2),
         ]),
-        Cont("sc-seg-row", 1, 25, 23, 31, [
+        Cont("sc-seg-row", 1, 25, 26, 34, [
             Cont("sc-core", 1, 7, 1, 10, [L("sk-core", 1, 25, 1, 2)], 2),
             Cont("sc-mid", 7, 13, 1, 10, [L("sk-mid", 1, 25, 1, 2)], 2),
             Cont("sc-ent", 13, 19, 1, 10, [L("sk-ent", 1, 25, 1, 2)], 2),
             Cont("sc-unmap", 19, 25, 1, 10, [L("sk-unmap", 1, 25, 1, 2)], 2),
         ]),
-        E("sk-note", 1, 25, 31, 33),
+        E("sk-note", 1, 25, 34, 36),
         # Keep open-VW table on Sourcing only (not Data) so other pages never bind it.
-        E("wb-src", 1, 25, 33, 35),
+        E("wb-src", 1, 25, 36, 38),
     ]
     movement_l = [
         E("movement-title", 1, 25, 1, 3),
@@ -1158,7 +1164,7 @@ Coverage / ABM = pack chrome (no open-VW). No daily snapshot grain.
                 {"id": "page-abm", "name": "Q4 Big Bet ABM Plays", "backgroundColor": "#f8fafc"},
                 {"id": "page-coverage", "name": "Pipeline Coverage", "backgroundColor": "#f8fafc"},
                 {"id": "page-bi100", "name": "BI Top 100", "backgroundColor": "#f8fafc"},
-                {"id": "page-data", "name": "Data", "visibility": "hidden"},
+                {"id": "page-data", "name": "Data", "visibility": "hidden", "backgroundColor": "#f8fafc"},
             ],
             "elements": elements, "layout": layout,
         },
