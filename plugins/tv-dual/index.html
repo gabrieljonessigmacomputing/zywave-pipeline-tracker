@@ -112,11 +112,15 @@
 
   function groupRows(rows, grain) {
     var map = {}, order = [];
+    var gWant = String(grain || "").toUpperCase();
     rows.forEach(function (r) {
-      if (r.grain !== grain) return;
-      if (!map[r.dim]) { map[r.dim] = { dim: r.dim, Target: 0, Actual: 0, Opps: null }; order.push(r.dim); }
-      if (r.series === "Target") map[r.dim].Target = r.val;
-      else if (r.series === "Actual") { map[r.dim].Actual = r.val; if (r.opps != null) map[r.dim].Opps = r.opps; }
+      if (String(r.grain || "").toUpperCase() !== gWant) return;
+      var dim = String(r.dim == null ? "" : r.dim).trim();
+      if (!dim) return;
+      if (!map[dim]) { map[dim] = { dim: dim, Target: 0, Actual: 0, Opps: null }; order.push(dim); }
+      var ser = String(r.series || "").toLowerCase().trim();
+      if (ser === "target") map[dim].Target = r.val;
+      else if (ser === "actual") { map[dim].Actual = r.val; if (r.opps != null) map[dim].Opps = r.opps; }
     });
     return order.map(function (d) { return map[d]; });
   }
@@ -186,9 +190,20 @@
     return h + '</tbody></table></div>';
   }
 
-  function srcHtml(src) {
-    var mkt = src.find(function (r) { return /market/i.test(r.dim); }) || { Actual: 0, Opps: 0 };
-    var sales = src.find(function (r) { return /sales/i.test(r.dim); }) || { Actual: 0, Opps: 0 };
+  function srcHtml(src, rows) {
+    var mkt = (src || []).find(function (r) { return /market/i.test(r.dim); });
+    var sales = (src || []).find(function (r) { return /sales/i.test(r.dim); });
+    // Fallback: pull SRC Actual rows directly if groupRows missed them
+    if ((!mkt || !mkt.Actual) || (!sales || !sales.Actual)) {
+      (rows || []).forEach(function (r) {
+        if (String(r.grain || "").toUpperCase() !== "SRC") return;
+        if (String(r.series || "").toLowerCase() !== "actual") return;
+        var d = String(r.dim || "");
+        if (/market/i.test(d)) mkt = { dim: d, Actual: r.val };
+        if (/sales/i.test(d)) sales = { dim: d, Actual: r.val };
+      });
+    }
+    mkt = mkt || { Actual: 0 }; sales = sales || { Actual: 0 };
     var tot = (mkt.Actual || 0) + (sales.Actual || 0) || 1;
     var mPct = (mkt.Actual || 0) / tot, sPct = (sales.Actual || 0) / tot;
     return '<div class="src"><div class="title">Open Stage 2+ by Lead Source</div><div class="src-row">' +
@@ -310,7 +325,7 @@
     var src = groupRows(LAST, "SRC");
     root.innerHTML =
       '<div class="charts"><div class="panel" id="p-seg"></div><div class="panel" id="p-prod"></div></div>' +
-      attainmentHtml(seg) + srcHtml(src);
+      attainmentHtml(seg) + srcHtml(src, LAST);
     drawPanel(document.getElementById("p-seg"), "Pipeline by Segment: 2H Target vs Actual", seg);
     drawPanel(document.getElementById("p-prod"), "Pipeline by Product Group: 2H Target vs Actual", prod);
   }
@@ -399,3 +414,5 @@
 </script>
 </body>
 </html>
+
+<!-- build 20261013183536 -->
