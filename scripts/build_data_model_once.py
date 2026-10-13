@@ -249,6 +249,16 @@ SELECT 'SRC', a.DIM, 'Actual', a.ACTUAL, a.OPPS::FLOAT FROM src_act a
         ("S0_OPPS", None), ("S0_ACV", m()), ("S1_OPPS", None), ("S1_ACV", m()),
         ("S2_OPPS", None), ("S2_ACV", m()),
     ]
+    # 7) Daily open ACV trend — date-filtered snapshot (one job for Movement)
+    snap = """
+SELECT SNAPSHOTDATE AS DT, COALESCE(SUM(FCST_NETACV),0) AS ACV
+FROM BI_STAGING.SNAPSHOT.VW_PIPELINE
+WHERE SNAPSHOTDATE >= DATEADD(day, -60, CURRENT_DATE())
+  AND LEFT(STAGE_NAME,1) IN ('2','3','4','5','6','7')
+  AND FCST_NETACV BETWEEN 0 AND 5000000
+GROUP BY 1
+"""
+
     return [
         sql_table("kpi-pack", "KPI Pack", pack, pack_cols),
         sql_table("kpi-walkin", "KPI Walkin", walkin, [("WALKIN_OPPS", None), ("WALKIN_ACV", m())]),
@@ -259,6 +269,8 @@ SELECT 'SRC', a.DIM, 'Actual', a.ACTUAL, a.OPPS::FLOAT FROM src_act a
             ("MONTH", {"kind": "datetime", "formatString": "%b %Y"}), ("ACV", m())]),
         sql_table("chart-tv", "Chart Target Actual Source", charts, [
             ("GRAIN", None), ("DIM", None), ("SERIES", None), ("VAL", m()), ("OPPS", None)]),
+        sql_table("chart-snap", "Chart Snapshot Trend", snap, [
+            ("DT", {"kind": "datetime", "formatString": "%b %d"}), ("ACV", m())]),
     ]
 
 

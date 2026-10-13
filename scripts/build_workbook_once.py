@@ -411,6 +411,20 @@ def build():
           hero(ref(Z, "LOST_ACV", "$,.0f"), RED, 32) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">{ref(Z,"LOST_OPPS",",.0f")} opps · ≤ $50k</span></p>'),
         T("mk-created", label("CREATED Q4") + "\n" + hero(ref(P, "Q4_CREATED_ACV", "$,.0f"), ORANGE, 32)),
+        T("mv-trend-h", f'## Daily open pipeline\n<span style="color:{MUTED}">Last 60 days · Stage 2+ forecasted net ACV</span>'),
+        {
+            "id": "chart-snap", "kind": "line-chart", "name": "Open Pipeline Snapshot Trend",
+            "source": dm("chart-snap"),
+            "columns": [
+                {"id": "sn-d", "name": "Date", "formula": "[Chart Snapshot Trend/DT]",
+                 "format": {"kind": "datetime", "formatString": "%b %d"}},
+                {"id": "sn-v", "name": "ACV", "formula": "[Chart Snapshot Trend/ACV]",
+                 "format": {"kind": "number", "formatString": "$,.2s"}},
+            ],
+            "xAxis": {"columnId": "sn-d"}, "yAxis": {"columnIds": ["sn-v"]},
+            "color": {"by": "single", "value": BLUE},
+            "style": {"backgroundColor": WHITE, "borderRadius": "round", "borderColor": BORDER, "borderWidth": 1},
+        },
     ]
 
     # ═══════════════ CREATED ═══════════════
@@ -479,7 +493,7 @@ def build():
         },
         T("data-note", """# Fast path
 
-6 DM SQL grains · each warehouse job once.
+7 DM SQL grains · each warehouse job once.
 Pace + dual TV + funnel plugins subscribe to pass-through tables (no SumIf re-inline).
 """),
     ]
@@ -570,6 +584,8 @@ Pace + dual TV + funnel plugins subscribe to pass-through tables (no SumIf re-in
         Cont("mc-4", 1, 9, 8, 13, [L("mk-won", 1, 25, 1, 8)]),
         Cont("mc-5", 9, 17, 8, 13, [L("mk-lost", 1, 25, 1, 8)]),
         Cont("mc-6", 17, 25, 8, 13, [L("mk-created", 1, 25, 1, 8)]),
+        E("mv-trend-h", 1, 25, 13, 15),
+        E("chart-snap", 1, 25, 15, 26),
     ]
     created_l = [
         E("created-title", 1, 25, 1, 3),
