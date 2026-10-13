@@ -27,8 +27,9 @@ PLUGINS = [
     },
     {
         "key": "tv",
-        "name": "Pipeline Tracker · Target vs Actual dual",
-        "description": "Segment + product Target vs Actual from one chart-tv grain (single warehouse job).",
+        # New pluginId when URL must change — Sigma often ignores URL PATCH on existing plugins.
+        "name": "Pipeline Tracker · Target vs Actual v5",
+        "description": "ACV-fast product actuals; segment targets (optional kpiSource for SEG/SRC).",
         "url": "https://gabrieljonessigmacomputing.github.io/zywave-pipeline-tracker/plugins/tv-dual-v5/",
         "devUrl": "http://localhost:5173",
     },
