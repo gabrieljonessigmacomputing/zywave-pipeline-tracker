@@ -778,13 +778,15 @@ def build():
           f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"CLOSE_FY_PCT",".0%")} of open</span></p>'),
         T("yoy-h", f'## Pipeline Created by Quarter — YoY\n<span style="color:{MUTED}">FY2025 vs FY2026 · Stage 2+ attained · ACV metrics</span>'),
         {
-            "id": "chart-created", "kind": "bar-chart", "name": "Pipeline Created YoY by Quarter",
+            # Distinct id from DM element "chart-created" (closemo/product share ids and work,
+            # but YoY stayed empty — rename viz to avoid any source/self collision).
+            "id": "chart-yoy", "kind": "bar-chart", "name": "Pipeline Created YoY by Quarter",
             "source": dm("chart-created"),
             "columns": [
                 {"id": "ccm-ord", "name": "Ord", "formula": "[Chart Created/ORD]"},
                 {"id": "ccm-q", "name": "Quarter", "formula": "[Chart Created/QUARTER]"},
                 {"id": "ccm-fy", "name": "FY", "formula": "[Chart Created/FY]"},
-                {"id": "ccm-v", "name": "ACV", "formula": "Sum([Chart Created/ACV])",
+                {"id": "ccm-v", "name": "ACV", "formula": "[Chart Created/ACV]",
                  "format": {"kind": "number", "formatString": "$,.2s"}},
             ],
             "xAxis": {"columnId": "ccm-q"},
@@ -1073,7 +1075,7 @@ Coverage / ABM = pack chrome (no open-VW). No daily snapshot grain.
         Cont("ckp-4", 16, 21, 3, 8, [L("ckp-ccq", 1, 25, 1, 2)]),
         Cont("ckp-5", 21, 25, 3, 8, [L("ckp-won", 1, 25, 1, 2)]),
         E("yoy-h", 1, 25, 8, 10),
-        E("chart-created", 1, 25, 10, 24),
+        E("chart-yoy", 1, 25, 10, 24),
         E("tbl-yoy", 1, 25, 24, 32),
         E("bridge-h", 1, 25, 32, 34),
         Cont("cc-start", 1, 4, 34, 39, [L("ck-start", 1, 25, 1, 2)]),
