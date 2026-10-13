@@ -157,10 +157,6 @@ def build():
         # ACV-only TV grain (fast).
         pass_tbl("wb-tv", "WB TV", "chart-tv", "Chart Target Actual Source",
                  [("GRAIN", None), ("DIM", None), ("SERIES", None), ("VAL", m()), ("OPPS", None)]),
-        # Created YoY — pass-through so chart binds element (not DM) like working funnel pattern
-        pass_tbl("wb-yoy", "WB YoY", "chart-created", "Chart Created", [
-            ("ORD", None), ("QUARTER", None), ("FY2025", m()), ("FY2026", m()),
-        ]),
     ]
 
     # Column ids on wb-pack (must match pack_cols order above)
@@ -783,27 +779,30 @@ def build():
         T("yoy-h", f'## Pipeline Created by Quarter — YoY\n<span style="color:{MUTED}">FY2025 vs FY2026 · Stage 2+ attained · ACV metrics</span>'),
         {
             "id": "chart-created", "kind": "bar-chart", "name": "Pipeline Created YoY by Quarter",
-            "source": {"kind": "element", "elementId": "wb-yoy"},
+            "source": dm("chart-created"),
             "columns": [
-                {"id": "ccm-ord", "name": "Ord", "formula": "[WB YoY/ORD]"},
-                {"id": "ccm-q", "name": "Quarter", "formula": "[WB YoY/QUARTER]"},
-                {"id": "ccm-fy25", "name": "FY2025", "formula": "[WB YoY/FY2025]",
-                 "format": {"kind": "number", "formatString": "$,.2s"}},
-                {"id": "ccm-fy26", "name": "FY2026", "formula": "[WB YoY/FY2026]",
+                {"id": "ccm-ord", "name": "Ord", "formula": "[Chart Created/ORD]"},
+                {"id": "ccm-q", "name": "Quarter", "formula": "[Chart Created/QUARTER]"},
+                {"id": "ccm-fy", "name": "FY", "formula": "[Chart Created/FY]"},
+                {"id": "ccm-v", "name": "ACV", "formula": "Sum([Chart Created/ACV])",
                  "format": {"kind": "number", "formatString": "$,.2s"}},
             ],
             "xAxis": {"columnId": "ccm-q"},
-            "yAxis": {"columnIds": ["ccm-fy25", "ccm-fy26"]},
+            "yAxis": {"columnIds": ["ccm-v"]},
             "stacking": "none",
+            "color": {
+                "by": "category", "column": "ccm-fy",
+                "scheme": ["#94a3b8", "#38bdf8"],
+            },
             "style": {"backgroundColor": WHITE, "borderRadius": "round", "borderColor": BORDER, "borderWidth": 1},
         },
         {
             "id": "tbl-yoy", "kind": "table", "name": "Created YoY by Quarter",
-            "source": {"kind": "element", "elementId": "wb-yoy"},
+            "source": dm("chart-created"),
             "columns": [
-                {"id": "ty-q", "name": "Quarter", "formula": "[WB YoY/QUARTER]"},
-                {"id": "ty-25", "name": "FY2025", "formula": "[WB YoY/FY2025]", "format": m()},
-                {"id": "ty-26", "name": "FY2026", "formula": "[WB YoY/FY2026]", "format": m()},
+                {"id": "ty-q", "name": "Quarter", "formula": "[Chart Created/QUARTER]"},
+                {"id": "ty-fy", "name": "FY", "formula": "[Chart Created/FY]"},
+                {"id": "ty-a", "name": "ACV", "formula": "[Chart Created/ACV]", "format": m()},
             ],
             "style": {"backgroundColor": WHITE, "borderRadius": "round", "borderColor": BORDER, "borderWidth": 1},
         },
@@ -1122,7 +1121,7 @@ Coverage / ABM = pack chrome (no open-VW). No daily snapshot grain.
     ]
     data_l = [E("data-note", 1, 25, 1, 6)]
     row = 6
-    for wid in ["wb-pack", "wb-walkin", "wb-funnel", "wb-tv", "wb-yoy"]:
+    for wid in ["wb-pack", "wb-walkin", "wb-funnel", "wb-tv"]:
         data_l.append(E(wid, 1, 25, row, row + 3))
         row += 3
 

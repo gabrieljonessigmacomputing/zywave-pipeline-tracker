@@ -301,17 +301,18 @@ WHERE METRIC_NAME='Forecasted Net ACV' AND STAGE_GROUP='2-7'
 GROUP BY 1,2
 """
 
-    # 5) Created YoY by quarter (stills) — wide FY2025/FY2026; same filters as pack created
+    # 5) Created YoY by quarter (stills) — long FY×Quarter for category-colored bars
     created_month = """
 SELECT
   QUARTER(STAGE_2_DATETIME) AS ORD,
   'Q' || QUARTER(STAGE_2_DATETIME) AS QUARTER,
-  COALESCE(SUM(IFF(YEAR(STAGE_2_DATETIME) = 2025, METRIC_VALUE, 0)), 0) AS FY2025,
-  COALESCE(SUM(IFF(YEAR(STAGE_2_DATETIME) = 2026, METRIC_VALUE, 0)), 0) AS FY2026
+  'FY' || YEAR(STAGE_2_DATETIME) AS FY,
+  COALESCE(SUM(METRIC_VALUE), 0) AS ACV
 FROM BI_STAGING.DATA.OPPORTUNITY_ACV_METRICS
 WHERE METRIC_NAME = 'Forecasted Net ACV' AND STAGE_2_ATTAINED = TRUE
   AND STAGE_2_DATETIME >= '2025-01-01' AND STAGE_2_DATETIME < '2027-01-01'
-GROUP BY 1, 2
+  AND YEAR(STAGE_2_DATETIME) IN (2025, 2026)
+GROUP BY 1, 2, 3
 """
 
     # 6) Close month × stage — ACV open FY2026 (Open page only; no VW)
@@ -414,7 +415,7 @@ SELECT 'PROD', a.DIM, 'Actual', a.ACTUAL, NULL FROM prod_act a
         sql_table("chart-funnel", "Chart Funnel", funnel, [
             ("STAGE", None), ("ORD", None), ("ACV", m()), ("OPPS", None)]),
         sql_table("chart-created", "Chart Created", created_month, [
-            ("ORD", None), ("QUARTER", None), ("FY2025", m()), ("FY2026", m())]),
+            ("ORD", None), ("QUARTER", None), ("FY", None), ("ACV", m())]),
         sql_table("chart-closemo", "Chart Close Month Stage", close_mo, [
             ("MONTH", {"kind": "datetime", "formatString": "%b %Y"}),
             ("STAGE", None), ("ORD", None), ("ACV", m()), ("OPPS", None)]),
