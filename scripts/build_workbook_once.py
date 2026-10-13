@@ -143,7 +143,6 @@ def build():
 
     plug = load_plugin_ids()
     PACE_ID, FUNNEL_ID, TV_ID = plug["pace"], plug["funnel"], plug["tv"]
-    OPEN_KPI_ID = plug["openKpis"]
     P, W = "WB Pack", "WB Walkin"
     Z = "WB Closed"
 
@@ -195,9 +194,9 @@ def build():
         }
 
     def open_kpi_plugin(eid, mode, src_eid="wb-tv"):
-        # KPI grain rows from the same chart-tv scan as TV charts — no SumIf / no wb-open.
+        # Reuse approved TV plugin + layout mode (new plugin ids often never get element data).
         return {
-            "id": eid, "kind": "plugin", "pluginId": OPEN_KPI_ID, "displayName": f"Open KPIs ({mode})",
+            "id": eid, "kind": "plugin", "pluginId": TV_ID, "displayName": f"Open KPIs ({mode})",
             "config": {
                 "source": {"kind": "element", "elementId": src_eid},
                 "grain": {"kind": "column", "columnId": f"{src_eid}-0", "source": "source"},
@@ -205,7 +204,7 @@ def build():
                 "series": {"kind": "column", "columnId": f"{src_eid}-2", "source": "source"},
                 "val": {"kind": "column", "columnId": f"{src_eid}-3", "source": "source"},
                 "opps": {"kind": "column", "columnId": f"{src_eid}-4", "source": "source"},
-                "mode": mode,
+                "layout": mode,
             },
             "style": {"backgroundColor": WHITE},
         }
