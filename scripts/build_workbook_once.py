@@ -409,7 +409,7 @@ def build():
 
     # ═══════════════ MOVEMENT ═══════════════
     els += [
-        T("movement-title", f'# Pipeline Movement\n<p class="p-small"><span style="color:{MUTED}">Daily snapshots · customers &amp; comparison</span></p>'),
+        T("movement-title", f'# Pipeline Movement\n<p class="p-small"><span style="color:{MUTED}">Q4 closed from ACV metrics · 14-day snapshot trend</span></p>'),
         C("mc-1"), C("mc-2"), C("mc-3"), C("mc-4", GREEN_BG, "#bbf7d0"), C("mc-5", RED_BG, "#fecaca"), C("mc-6", AMBER_BG, "#fbbf24"),
         T("mk-open", label("TOTAL OPEN PIPELINE") + "\n" + hero(ref(P, "TOTAL_ACV", "$,.0f"), INK, 32)),
         T("mk-q4",
@@ -426,7 +426,7 @@ def build():
           hero(ref(Z, "LOST_ACV", "$,.0f"), RED, 32) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">{ref(Z,"LOST_OPPS",",.0f")} opps · ≤ $50k</span></p>'),
         T("mk-created", label("CREATED Q4") + "\n" + hero(ref(P, "Q4_CREATED_ACV", "$,.0f"), ORANGE, 32)),
-        T("mv-trend-h", f'## Daily open pipeline\n<span style="color:{MUTED}">Last 30 days · Stage 2+ forecasted net ACV</span>'),
+        T("mv-trend-h", f'## Daily open pipeline\n<span style="color:{MUTED}">Last 14 days · Stage 2+ forecasted net ACV</span>'),
         {
             "id": "chart-snap", "kind": "line-chart", "name": "Open Pipeline Snapshot Trend",
             "source": dm("chart-snap"),
@@ -503,9 +503,9 @@ def build():
         },
         T("data-note", """# Fast path
 
-ROTB / Open / Total / Created = ACV pack + walk-in + funnel (+ early open). No open-VW.
-Sourcing = open-VW 1-row (Lead Source + Segment). Movement = closed-VW Q4 + snapshot trend.
-TV = ACV product actuals; segment targets only on Total (segment actuals on Sourcing).
+ROTB / Open / Total / Created / Movement KPIs = ACV metrics (+ walk-in snapshot).
+Sourcing only = open presentation VW (Lead Source + SplitSegment tokens).
+Movement trend = 14-day snapshot VW. TV = ACV product; segment targets on Total.
 """),
     ]
 
