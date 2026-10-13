@@ -480,6 +480,24 @@ def build():
           label("CREATED THIS MONTH") + "\n" +
           hero(ref(P, "MONTH_ACV", "$,.2s"), ORANGE, 26) + "\n" +
           f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"MONTH_OPPS",",.0f")} opps</span></p>'),
+        T("total-seg-h", f'## Segment 2H targets\n<span style="color:{MUTED}">Plan chrome · tagged actuals live on Pipeline Sourcing (open-VW)</span>'),
+        C("ts-core"), C("ts-mid"), C("ts-ent"), C("ts-tot", TEAL_BG, "#99f6e4"),
+        T("ts-core-b",
+          label("CORE · 2H TARGET") + "\n" +
+          hero("$18M", BLUE, 26) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">Actuals → Sourcing</span></p>'),
+        T("ts-mid-b",
+          label("MID-MARKET · 2H TARGET") + "\n" +
+          hero("$16M", TEAL, 26) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">Actuals → Sourcing</span></p>'),
+        T("ts-ent-b",
+          label("ENTERPRISE · 2H TARGET") + "\n" +
+          hero("$20M", ORANGE, 26) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">Actuals → Sourcing</span></p>'),
+        T("ts-tot-b",
+          label("TOTAL OPEN (PACK)") + "\n" +
+          hero(ref(P, "TOTAL_ACV", "$,.2s"), TEAL, 26) + "\n" +
+          f'<p class="p-small"><span style="color:{MUTED}">{ref(P,"TOTAL_OPPS",",.0f")} opps · ACV-fast</span></p>'),
         T("total-defs",
           f'<p class="p-small"><span style="color:{MUTED}">Product actuals = ACV metrics (fast) · '
           f'Segment bars = 2H targets (open-VW segment actuals on Pipeline Sourcing) · '
@@ -787,13 +805,18 @@ No daily snapshot grain — Movement uses pack bridge.
         Cont("tc-1", 1, 9, 3, 8, [L("tk-cq", 1, 25, 1, 8)]),
         Cont("tc-2", 9, 17, 3, 8, [L("tk-nq", 1, 25, 1, 8)]),
         Cont("tc-3", 17, 25, 3, 8, [L("tk-2q", 1, 25, 1, 8)]),
-        E("plugin-tv", 1, 25, 8, 24),
-        E("total-early-h", 1, 25, 24, 26),
-        Cont("te-s0", 1, 7, 26, 31, [L("te-s0-b", 1, 25, 1, 2)]),
-        Cont("te-s1", 7, 13, 26, 31, [L("te-s1-b", 1, 25, 1, 2)]),
-        Cont("te-s2", 13, 19, 26, 31, [L("te-s2-b", 1, 25, 1, 2)]),
-        Cont("te-mo", 19, 25, 26, 31, [L("te-mo-b", 1, 25, 1, 2)]),
-        E("total-defs", 1, 25, 31, 33),
+        E("plugin-tv", 1, 25, 8, 22),
+        E("total-early-h", 1, 25, 22, 24),
+        Cont("te-s0", 1, 7, 24, 29, [L("te-s0-b", 1, 25, 1, 2)]),
+        Cont("te-s1", 7, 13, 24, 29, [L("te-s1-b", 1, 25, 1, 2)]),
+        Cont("te-s2", 13, 19, 24, 29, [L("te-s2-b", 1, 25, 1, 2)]),
+        Cont("te-mo", 19, 25, 24, 29, [L("te-mo-b", 1, 25, 1, 2)]),
+        E("total-seg-h", 1, 25, 29, 31),
+        Cont("ts-core", 1, 7, 31, 36, [L("ts-core-b", 1, 25, 1, 2)]),
+        Cont("ts-mid", 7, 13, 31, 36, [L("ts-mid-b", 1, 25, 1, 2)]),
+        Cont("ts-ent", 13, 19, 31, 36, [L("ts-ent-b", 1, 25, 1, 2)]),
+        Cont("ts-tot", 19, 25, 31, 36, [L("ts-tot-b", 1, 25, 1, 2)]),
+        E("total-defs", 1, 25, 36, 38),
     ]
     sourcing_l = [
         E("sourcing-title", 1, 18, 1, 3), E("ctrl-period", 18, 25, 1, 3),
