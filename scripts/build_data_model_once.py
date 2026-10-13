@@ -195,8 +195,8 @@ WHERE NOT "Is Closed"
   AND FCST_NETACV BETWEEN 0 AND 5000000
 """
 
-    # 6b) TV charts — ACV product only (fast). SEG Actual/Target from open-VW is folded into
-    # kpi-src (workbook TV plugin also plots SRC cards from wb-src). No second VW scan here.
+    # 6b) TV charts — ACV product + one open-VW CTE for SEG/SRC (Total page). ROTB early stays
+    # on kpi-open (ACV). ROTB sourcing uses kpi-src (same VW shape; warehouse result cache helps).
     charts = """
 WITH prod_act AS (
   SELECT
@@ -212,6 +212,18 @@ WITH prod_act AS (
   FROM BI_STAGING.DATA.OPPORTUNITY_ACV_METRICS
   WHERE METRIC_NAME = 'Forecasted Net ACV' AND STAGE_GROUP = '2-7'
   GROUP BY 1
+),
+open_vw AS (
+  SELECT
+    COALESCE(SUM(IFF("Lead Source"='Marketing', FCST_NETACV, 0)),0) AS MKT_ACV,
+    COALESCE(SUM(IFF("Lead Source"='Sales Generated', FCST_NETACV, 0)),0) AS SALES_ACV,
+    COALESCE(SUM(IFF(CONTAINS("Segment",'Core'), FCST_NETACV, 0)),0) AS SEG_CORE,
+    COALESCE(SUM(IFF(CONTAINS("Segment",'Mid') OR "Segment"='MM', FCST_NETACV, 0)),0) AS SEG_MID,
+    COALESCE(SUM(IFF(CONTAINS("Segment",'Enterprise') OR CONTAINS("Segment",'Up-Market'), FCST_NETACV, 0)),0) AS SEG_ENT
+  FROM BI_PRESENTATION.REPORT.VW_PIPELINE
+  WHERE NOT "Is Closed"
+    AND LEFT("Stage Name",1) IN ('2','3','4','5','6','7')
+    AND FCST_NETACV BETWEEN 0 AND 5000000
 )
 SELECT 'SEG' AS GRAIN, t.DIM, 'Target' AS SERIES, t.TARGET AS VAL, NULL::FLOAT AS OPPS
 FROM (
@@ -219,6 +231,16 @@ FROM (
   UNION ALL SELECT 'Mid-Market', 16000000
   UNION ALL SELECT 'Enterprise', 20000000
 ) t
+UNION ALL
+SELECT 'SEG', 'Core', 'Actual', SEG_CORE, NULL FROM open_vw
+UNION ALL
+SELECT 'SEG', 'Mid-Market', 'Actual', SEG_MID, NULL FROM open_vw
+UNION ALL
+SELECT 'SEG', 'Enterprise', 'Actual', SEG_ENT, NULL FROM open_vw
+UNION ALL
+SELECT 'SRC', 'Marketing', 'Actual', MKT_ACV, NULL FROM open_vw
+UNION ALL
+SELECT 'SRC', 'Sales', 'Actual', SALES_ACV, NULL FROM open_vw
 UNION ALL
 SELECT 'PROD', t.DIM, 'Target', t.TARGET, NULL FROM (
   SELECT 'Insurance Intelligence' AS DIM, 31000000::FLOAT AS TARGET

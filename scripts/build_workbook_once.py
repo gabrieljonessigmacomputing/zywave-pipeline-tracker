@@ -187,8 +187,8 @@ def build():
             "style": {"backgroundColor": WHITE},
         }
 
-    def tv_plugin(eid, src_eid="wb-tv", kpi_eid="wb-src"):
-        # ACV chart grain + 1-row VW kpi grain (SEG/SRC actuals) — no second VW in chart-tv.
+    def tv_plugin(eid, src_eid="wb-tv"):
+        # Single chart-tv grain: SEG/SRC/PROD target+actual (no synth fallback in plugin).
         return {
             "id": eid, "kind": "plugin", "pluginId": TV_ID, "displayName": "Target vs Actual",
             "config": {
@@ -198,12 +198,6 @@ def build():
                 "series": {"kind": "column", "columnId": f"{src_eid}-2", "source": "source"},
                 "val": {"kind": "column", "columnId": f"{src_eid}-3", "source": "source"},
                 "opps": {"kind": "column", "columnId": f"{src_eid}-4", "source": "source"},
-                "kpiSource": {"kind": "element", "elementId": kpi_eid},
-                "mkt": {"kind": "column", "columnId": f"{kpi_eid}-0", "source": "kpiSource"},
-                "sales": {"kind": "column", "columnId": f"{kpi_eid}-1", "source": "kpiSource"},
-                "segCore": {"kind": "column", "columnId": f"{kpi_eid}-5", "source": "kpiSource"},
-                "segMid": {"kind": "column", "columnId": f"{kpi_eid}-6", "source": "kpiSource"},
-                "segEnt": {"kind": "column", "columnId": f"{kpi_eid}-7", "source": "kpiSource"},
             },
             "style": {"backgroundColor": WHITE},
         }
