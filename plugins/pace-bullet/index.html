@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Goal pace bar</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;background:transparent;
+    font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:#0f172a;-webkit-font-smoothing:antialiased}
+  #root{box-sizing:border-box;width:100%;height:100%;padding:14px 18px;
+    display:flex;flex-direction:column;justify-content:center;gap:6px;min-width:0}
+  .title{font-size:13px;font-weight:500;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .value{font-size:30px;font-weight:700;letter-spacing:-.02em;line-height:1.1;color:#0f172a}
+  .pct{font-size:14px;font-weight:600;color:var(--fill,#f97316)}
+  .track{position:relative;height:8px;border-radius:999px;background:#e2e8f0;margin:10px 0 6px}
+  .fill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:var(--fill,#f97316);
+    transition:width .35s ease}
+  .tick{position:absolute;top:-5px;bottom:-5px;width:2px;margin-left:-1px;border-radius:1px;
+    background:var(--tick,#334155);transition:left .35s ease}
+  .foot{font-size:12px;color:#64748b}
+  .foot b{font-weight:600;color:#334155}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/@sigmacomputing/plugin"></script>
+<script>
+(function () {
+  "use strict";
+  var root = document.getElementById("root");
+
+  // ---------- helpers ----------
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function num(v) { var n = Number(v); return isFinite(n) ? n : null; }
+  function clamp01(x) { return Math.max(0, Math.min(1, x)); }
+  // Auto-detect 0-1 vs 0-100. Values <= 1 are fractions; > 1 are percents.
+  function toFrac(v) {
+    v = num(v);
+    if (v === null) return null;
+    return Math.abs(v) <= 1 ? v : v / 100;
+  }
+  function sig(v, p) {
+    // d3-style ".Ns" with SI suffix (B instead of G)
+    if (v === 0) return "0";
+    var units = [[1e12, "T"], [1e9, "B"], [1e6, "M"], [1e3, "K"]];
+    var a = Math.abs(v);
+    for (var i = 0; i < units.length; i++) {
+      if (a >= units[i][0]) {
+        var s = v / units[i][0];
+        return (Math.abs(s) >= Math.pow(10, p) ? String(Math.round(s)) : s.toPrecision(p)) + units[i][1];
+      }
+    }
+    return a >= Math.pow(10, p) ? String(Math.round(v)) : Number(v.toPrecision(p)).toString();
+  }
+  function group(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+  // valueFormat hint: "$,.2s" (default), "$,.0f", ",.0f", "$.1s", ...
+  function fmt(v, hint) {
+    v = num(v); if (v === null) return "—";
+    var m = /^\s*(\$)?(,)?\.?(\d)?([sf])\s*$/.exec(hint || "") || /^\s*(\$)?(,)?\.(\d)([sf])\s*$/.exec("$,.2s");
+    var dollar = m[1] ? "$" : "", comma = !!m[2], p = m[3] === undefined ? 2 : +m[3], kind = m[4];
+    var body;
+    if (kind === "s") body = sig(v, Math.max(1, p));
+    else {
+      body = Math.abs(v).toFixed(p);
+      if (comma) { var parts = body.split("."); parts[0] = group(parts[0]); body = parts.join("."); }
+      if (v < 0) body = "-" + body;
+    }
+    return body.charAt(0) === "-" ? "-" + dollar + body.slice(1) : dollar + body;
+  }
+  function pctStr(f) { return (f * 100).toFixed(f * 100 >= 100 || f === 0 ? 0 : 0) + "%"; }
+  function colorOk(c) { return typeof c === "string" && /^#?[0-9a-fA-F]{3,8}$|^[a-z]+$|^rgba?\(/.test(c.trim()); }
+  function normColor(c, d) {
+    if (!colorOk(c)) return d; c = c.trim();
+    return /^[0-9a-fA-F]{3,8}$/.test(c) ? "#" + c : c;
+  }
+
+  function draw(d) {
+    var actual = num(d.actual), goal = num(d.goal);
+    var pct = (actual !== null && goal) ? actual / goal : 0;
+    var barPct = clamp01(pct);
+    var paced = d.paced === null || d.paced === undefined ? null : clamp01(d.paced);
+    var fillC = normColor(d.fillColor, "#f97316"), tickC = normColor(d.tickColor, "#334155");
+
+    var h = "";
+    if (d.title) h += '<div class="title">' + esc(d.title) + '</div>';
+    h += '<div class="row"><span class="value">' + esc(fmt(actual, d.valueFormat)) + '</span>' +
+         '<span class="pct">' + Math.round(pct * 100) + '% of goal</span></div>';
+    h += '<div class="track"><div class="fill" style="width:' + (barPct * 100).toFixed(2) + '%"></div>';
+    if (paced !== null) h += '<div class="tick" style="left:' + (paced * 100).toFixed(2) + '%"></div>';
+    h += '</div>';
+    h += '<div class="foot">Target: <b>' + esc(fmt(goal, d.valueFormat)) + '</b>' +
+         (paced !== null ? ' · <b>' + Math.round(paced * 100) + '%</b> paced' : '') + '</div>';
+    root.style.setProperty("--fill", fillC);
+    root.style.setProperty("--tick", tickC);
+    root.innerHTML = h;
+  }
+
+  // Demo data so the editor never looks broken before a source is bound.
+  function synth() {
+    return { title: "Closed Won ROTB", actual: 1840000, goal: 3000000, paced: 0.72,
+             valueFormat: "$,.2s", fillColor: null, tickColor: null };
+  }
+
+  var LAST = synth();
+  var client = window.sigmaComputing && window.sigmaComputing.plugin
+             ? window.sigmaComputing.plugin.client : null;
+
+  if (!client) { draw(LAST); }
+  else {
+    client.config.configureEditorPanel([
+      { name: "source", type: "element" },
+      { name: "actual", type: "column", source: "source", allowedTypes: ["number"], label: "Actual (number)" },
+      { name: "goal", type: "column", source: "source", allowedTypes: ["number"], label: "Goal (number)" },
+      { name: "pacedPct", type: "column", source: "source", allowedTypes: ["number"], label: "Paced % (0-1 or 0-100)" },
+      { name: "elapsedPct", type: "column", source: "source", allowedTypes: ["number"], label: "Elapsed % (optional, fallback for paced)" },
+      { name: "title", type: "text", label: "Title (optional)", placeholder: "e.g. Closed Won ROTB" },
+      { name: "valueFormat", type: "text", label: "Value format hint", placeholder: "$,.2s  or  $,.0f", defaultValue: "$,.2s" },
+      { name: "fillColor", type: "text", label: "Fill color (optional)", placeholder: "#f97316" },
+      { name: "tickColor", type: "text", label: "Tick color (optional)", placeholder: "#334155" }
+    ]);
+
+    var unsub = null, CFG = null, DATA = null;
+
+    function render() {
+      if (!CFG || !CFG.source || !DATA || !CFG.actual || !CFG.goal || !DATA[CFG.actual] || !DATA[CFG.goal]) {
+        var s = synth();
+        if (CFG) {
+          if (CFG.title) s.title = CFG.title;
+          if (CFG.valueFormat) s.valueFormat = CFG.valueFormat;
+          s.fillColor = CFG.fillColor; s.tickColor = CFG.tickColor;
+        }
+        draw(s); return;
+      }
+      function first(key) {
+        var col = CFG[key];
+        if (!col || !DATA[col] || !DATA[col].length) return null;
+        return DATA[col][0];
+      }
+      var paced = toFrac(first("pacedPct"));
+      if (paced === null) paced = toFrac(first("elapsedPct"));
+      LAST = { title: CFG.title, actual: num(first("actual")), goal: num(first("goal")), paced: paced,
+               valueFormat: CFG.valueFormat, fillColor: CFG.fillColor, tickColor: CFG.tickColor };
+      draw(LAST);
+    }
+
+    client.config.subscribe(function (cfg) {
+      if (unsub) { unsub(); unsub = null; }
+      CFG = cfg || null; DATA = null;
+      if (!CFG || !CFG.source) { render(); return; }
+      unsub = client.elements.subscribeToElementData(CFG.source, function (data) {
+        DATA = data; render();
+      });
+      render();
+    });
+  }
+
+  if (!client) draw(LAST);
+})();
+</script>
+</body>
+</html>
